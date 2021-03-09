@@ -516,7 +516,7 @@
 			capture-volume = <0>;
 			io-channels = <&saradc 4>;
 			hp-det-adc-value = <1000>;
-			spk-ctl = <&gpio3 RK_PC5 GPIO_ACTIVE_HIGH>;
+			spk-ctl-gpios = <&gpio3 RK_PC5 GPIO_ACTIVE_HIGH>;
 			status = "okay";
 		};
 	};
