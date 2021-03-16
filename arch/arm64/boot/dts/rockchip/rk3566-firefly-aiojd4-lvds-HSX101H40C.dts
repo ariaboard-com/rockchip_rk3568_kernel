@@ -91,7 +91,7 @@
 
 //open gslx680 tp
 &i2c2 {
-    status = "disabled";
+    status = "okay";
     clock-frequency = <100000>;
     //i2c-scl-rising-time-ns = <800>;
     //i2c-scl-falling-time-ns = <100>;#if 0
