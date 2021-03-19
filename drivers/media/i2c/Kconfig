@@ -1869,6 +1869,12 @@ config VIDEO_MP6507
 	help
 	  This a driver used pwm to drive motor
 
+config VIDEO_XC7022
+      tristate "Firefly XC7022/XC6130 support."
+      depends on VIDEO_V4L2 && I2C
+      ---help---
+              Driver for sv-taysh camera.
+
 endmenu
 
 menu "Sensors used on soc_camera driver"
