@@ -6,6 +6,7 @@
 
 #include "rk3568-firefly-port.dtsi"
 #include "rk3566-diff.dtsi"
+#include "lcd-mipi-to-lvds-HSX101H40C.dtsi"
 
 / {
     sd_vcc3v3_power: sd-vcc3v3-power {
@@ -241,7 +242,7 @@
 
 &i2c2 {
     status = "okay";
-    pinctrl-0 = <&i2c2m1_xfer>;
+   // pinctrl-0 = <&i2c2m1_xfer>;
     XC7022b: XC7022b@1b{
         status = "okay";
         compatible = "firefly,xc7022";

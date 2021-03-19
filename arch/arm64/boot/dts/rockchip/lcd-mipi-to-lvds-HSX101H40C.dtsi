@@ -64,10 +64,6 @@
 
 };
 
-&pwm1{
-    status = "okay";
-};
-
 &vcc3v3_lcd0_n{
     status = "disabled";
 };
@@ -234,7 +230,7 @@
 
 //open dsi0 main
 &route_dsi0 {
-    status = "disabled";
+    status = "okay";
 };
 &mipi_dphy0 {
     status = "okay";
@@ -258,20 +254,14 @@
 };
 
 // open backlight
-&backlight {
-        status = "okay";
-		enable-gpios = <&gpio4 5 GPIO_ACTIVE_HIGH>;
-};
 &pwm1{
     status = "okay";
 };
 
 //open gslx680 tp
 &i2c2 {
-    status = "disabled";
+    status = "okay";
     clock-frequency = <100000>;
-    //i2c-scl-rising-time-ns = <800>;
-    //i2c-scl-falling-time-ns = <100>;
     gslx680: gslx680@41 {
         compatible = "gslX680";
         reg = <0x41>;
@@ -285,6 +275,7 @@
         gsl,fw = <1>;
     };
 };
+
 &vcc3v3_lcd1_n{
     status = "disabled";
 };
