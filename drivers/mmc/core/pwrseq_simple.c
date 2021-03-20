@@ -73,6 +73,8 @@ static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
 
 	mmc_pwrseq_simple_set_gpios_value(pwrseq, 0);
 
+    msleep(100);
+
 	if (pwrseq->post_power_on_delay_ms)
 		msleep(pwrseq->post_power_on_delay_ms);
 }
