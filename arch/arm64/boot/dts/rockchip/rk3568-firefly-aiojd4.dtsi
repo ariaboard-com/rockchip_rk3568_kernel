@@ -178,6 +178,12 @@
     hp-ctl-gpios = <&gpio1 RK_PB0 GPIO_ACTIVE_HIGH>;
 };
 
+&rk809 {
+    rtc {
+        status = "disabled";
+    };
+};
+
 &pwm7 {
 	status = "okay";
 };
