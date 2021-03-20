@@ -783,7 +783,7 @@ static void rk817_shutdown_prepare(void)
 {
 	int ret;
 	struct rk808 *rk808 = i2c_get_clientdata(rk808_i2c_client);
-
+#if 0
 	/* close rtc int when power off */
 	regmap_update_bits(rk808->regmap,
 			   RK817_INT_STS_MSK_REG0,
@@ -791,7 +791,7 @@ static void rk817_shutdown_prepare(void)
 	regmap_update_bits(rk808->regmap,
 			   RK817_RTC_INT_REG,
 			   (0x3 << 2), (0x0 << 2));
-
+#endif
 	if (rk808->pins && rk808->pins->p && rk808->pins->power_off) {
 		ret = regmap_update_bits(rk808->regmap,
 					 RK817_SYS_CFG(3),
