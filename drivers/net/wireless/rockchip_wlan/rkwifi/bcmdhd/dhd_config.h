@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
+
 #ifndef _dhd_config_
 #define _dhd_config_
 
 #include <bcmdevs.h>
-#include <siutils.h>
 #include <dngl_stats.h>
 #include <dhd.h>
 #include <wlioctl.h>
@@ -15,7 +15,6 @@
 #define FW_TYPE_MESH    3
 #define FW_TYPE_ES      4
 #define FW_TYPE_MFG     5
-#define FW_TYPE_MINIME  6
 #define FW_TYPE_G       0
 #define FW_TYPE_AG      1
 
@@ -123,17 +122,10 @@ enum in_suspend_flags {
 };
 
 enum in_suspend_mode {
+	AUTO_SUSPEND = -1,
 	EARLY_SUSPEND = 0,
 	PM_NOTIFIER = 1
 };
-
-#ifdef HOST_TPUT_TEST
-enum data_drop_mode {
-	NO_DATA_DROP = 0,
-	TXPKT_DROP = 1,
-	XMIT_DROP = 2
-};
-#endif
 
 enum eapol_status {
 	EAPOL_STATUS_NONE = 0,
@@ -162,10 +154,6 @@ enum eapol_status {
 typedef struct dhd_conf {
 	uint chip;
 	uint chiprev;
-#ifdef GET_OTP_MODULE_NAME
-	char module_name[16];
-#endif
-	struct ether_addr otp_mac;
 	int fw_type;
 #ifdef BCMSDIO
 	wl_mac_list_ctrl_t fw_by_mac;
@@ -222,9 +210,6 @@ typedef struct dhd_conf {
 	int txinrx_thres;
 	int dhd_txminmax; // -1=DATABUFCNT(bus)
 	bool oob_enabled_later;
-#ifdef MINIME
-	uint32 ramsize;
-#endif
 #if defined(SDIO_ISR_THREAD)
 	bool intr_extn;
 #endif
@@ -270,8 +255,6 @@ typedef struct dhd_conf {
 	int ctrl_resched;
 	mchan_params_t *mchan;
 	char *wl_preinit;
-	char *wl_suspend;
-	char *wl_resume;
 	int tsq;
 	int orphan_move;
 	uint eapol_status;
@@ -283,23 +266,18 @@ typedef struct dhd_conf {
 	char hw_ether[62];
 #endif
 	wait_queue_head_t event_complete;
-#ifdef PROPTX_MAXCOUNT
-	int proptx_maxcnt_2g;
-	int proptx_maxcnt_5g;
-#endif /* DYNAMIC_PROPTX_MAXCOUNT */
-#ifdef HOST_TPUT_TEST
-	int data_drop_mode;
-#endif
 } dhd_conf_t;
 
 #ifdef BCMSDIO
-void dhd_conf_get_otp(dhd_pub_t *dhd, bcmsdh_info_t *sdh, si_t *sih);
+int dhd_conf_get_mac(dhd_pub_t *dhd, bcmsdh_info_t *sdh, uint8 *mac);
 #if defined(HW_OOB) || defined(FORCE_WOWLAN)
-void dhd_conf_set_hw_oob_intr(bcmsdh_info_t *sdh, struct si_pub *sih);
+void dhd_conf_set_hw_oob_intr(bcmsdh_info_t *sdh, uint chip);
 #endif
 void dhd_conf_set_txglom_params(dhd_pub_t *dhd, bool enable);
+int dhd_conf_set_blksize(bcmsdh_info_t *sdh);
 #endif
-void dhd_conf_set_path_params(dhd_pub_t *dhd, char *fw_path, char *nv_path);
+void dhd_conf_set_path_params(dhd_pub_t *dhd, void *sdh,
+	char *fw_path, char *nv_path);
 int dhd_conf_set_intiovar(dhd_pub_t *dhd, uint cmd, char *name, int val,
 	int def, bool down);
 int dhd_conf_get_band(dhd_pub_t *dhd);
@@ -334,7 +312,7 @@ void dhd_conf_set_garp(dhd_pub_t *dhd, int ifidx, uint32 ipa, bool enable);
 int dhd_conf_get_disable_proptx(dhd_pub_t *dhd);
 #endif
 uint dhd_conf_get_insuspend(dhd_pub_t *dhd, uint mask);
-int dhd_conf_set_suspend_resume(dhd_pub_t *dhd, int suspend);
+int dhd_conf_set_suspend_resume(dhd_pub_t *dhd, int suspend, int suspend_mode);
 void dhd_conf_postinit_ioctls(dhd_pub_t *dhd);
 int dhd_conf_preinit(dhd_pub_t *dhd);
 int dhd_conf_reset(dhd_pub_t *dhd);
