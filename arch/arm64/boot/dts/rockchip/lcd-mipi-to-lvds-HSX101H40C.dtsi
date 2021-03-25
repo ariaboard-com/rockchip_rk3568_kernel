@@ -8,7 +8,7 @@
  / {
 	model = "10.1 inches LVDS HSX101H40C (Linux)";
 	compatible = "rockchip,mipi-to-lvds-HSX101H40C", "rockchip,rk3566";
-
+    
 	 backlight:backlight {
 		status = "okay";
 		compatible = "pwm-backlight";
@@ -143,7 +143,6 @@
             05 05 01 28
             05 78 01 10
 		];
-
 		disp_timings0: display-timings {
             native-mode = <&timing0>;
             timing0: timing0 {
@@ -161,7 +160,9 @@
 			   de-active = <0>;
 			   pixelclk-active = <0>;
 			};
-		};
+
+         
+        };
 
 		ports {
 			#address-cells = <1>;
@@ -198,7 +199,7 @@
 	status = "disabled";
 };
 &i2s1_8ch{
-	status = "disabled";
+	status = "okay";
 };
 &pdm{
 	status = "disabled";
