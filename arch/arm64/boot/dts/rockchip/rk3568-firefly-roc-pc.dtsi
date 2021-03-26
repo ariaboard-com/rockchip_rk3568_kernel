@@ -119,7 +119,7 @@
 &i2c4 {
 	status = "okay";
 	XC7022b: XC7022b@1b {
-		 status = "okay";
+		 status = "disabled";
 		 compatible = "firefly,xc7022";
 		 reg = <0x1b>;
 		 clocks = <&cru CLK_CIF_OUT>;
