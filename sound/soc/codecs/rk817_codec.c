@@ -25,9 +25,29 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include "rk817_codec.h"
+#include <sound/jack.h>
+
+#include <linux/iio/iio.h>
+#include <linux/iio/machine.h>
+#include <linux/iio/driver.h>
+#include <linux/iio/consumer.h>
+#include <linux/extcon-provider.h>
+
+
+static const unsigned int headset_cable[] = {
+	EXTCON_JACK_MICROPHONE,
+	EXTCON_JACK_HEADPHONE,
+	EXTCON_NONE,
+};
 
 static int dbg_enable;
 module_param_named(dbg_level, dbg_enable, int, 0644);
+
+#define RK817_ADC_OVER_ADVALUE		1024
+#define RK817_ADC_DRIFT_ADVALUE		24	
+#define RK817_ADC_INVALID_ADVALUE	-1
+#define RK817_ADC_SAMPLE_JIFFIES	(500 / (MSEC_PER_SEC / HZ))     /* 500ms */
+static int hp_enable_global = 0;
 
 #define DBG(args...) \
 	do { \
@@ -88,10 +108,21 @@ struct rk817_codec_priv {
 	long int playback_path;
 	long int capture_path;
 
+	struct delayed_work adc_poll_work;
+	struct delayed_work hp_det_gpio_poll_work;
 	struct gpio_desc *spk_ctl_gpio;
 	struct gpio_desc *hp_ctl_gpio;
+	struct iio_channel *chan;
+	int spk_gpio;
+	int hp_det_gpio;
 	int spk_mute_delay;
 	int hp_mute_delay;
+	int hp_det_adc_value;
+	int hp_adc_drift_scope;
+
+	bool hp_insert;
+	struct snd_soc_jack hp_jack;
+	struct extcon_dev *edev;
 };
 
 static const struct reg_default rk817_reg_defaults[] = {
@@ -244,8 +275,7 @@ static int rk817_codec_ctl_gpio(struct rk817_codec_priv *rk817,
 		DBG("%s set hp clt %d\n", __func__, level);
 		msleep(rk817->hp_mute_delay);
 	}
-
-	return 0;
+		return 0;
 }
 
 static int rk817_reset(struct snd_soc_component *component)
@@ -944,8 +974,17 @@ static int rk817_digital_mute(struct snd_soc_dai *dai, int mute)
 			break;
 		case SPK_HP:
 		case RING_SPK_HP:
-			rk817_codec_ctl_gpio(rk817, CODEC_SET_SPK, 1);
-			rk817_codec_ctl_gpio(rk817, CODEC_SET_HP, 1);
+			if ( hp_enable_global && rk817->chan != NULL ){
+				rk817_codec_ctl_gpio(rk817, CODEC_SET_SPK, 0);
+				rk817_codec_ctl_gpio(rk817, CODEC_SET_HP, 1);
+			}else if(rk817->chan != NULL){
+				rk817_codec_ctl_gpio(rk817, CODEC_SET_SPK, 1);
+				rk817_codec_ctl_gpio(rk817, CODEC_SET_HP, 0);
+			}
+			else{
+				rk817_codec_ctl_gpio(rk817, CODEC_SET_SPK, 1);
+				rk817_codec_ctl_gpio(rk817, CODEC_SET_HP, 1);
+			}
 			break;
 		default:
 			break;
@@ -1034,10 +1073,104 @@ static int rk817_resume(struct snd_soc_component *component)
 	return 0;
 }
 
+static int rk817_enable_hp_control(struct rk817_codec_priv *rk817, bool enable)
+{
+	if (enable)
+		hp_enable_global = 1;
+	else
+		hp_enable_global = 0;
+return 0;
+}
+
+static int rk817_hp_adc_iio_read(struct rk817_codec_priv *rk817)
+{
+        struct iio_channel *channel = rk817->chan;
+        int val, ret;
+
+        if (!channel)
+                return RK817_ADC_INVALID_ADVALUE;
+        ret = iio_read_channel_raw(channel, &val);
+        if (ret < 0) {
+                printk("%s: read hp_det channel() error: %d\n",__func__, ret);
+                return ret;
+        }
+        return val;
+}
+
+static void rk817_hp_adc_poll(struct work_struct *work)
+{
+	struct rk817_codec_priv *rk817;
+	int result = -1;
+
+	rk817 = container_of(work, struct rk817_codec_priv, adc_poll_work.work);
+	result = rk817_hp_adc_iio_read(rk817);
+	//printk("%s: result=%d \n", __func__, result);
+	if (result > RK817_ADC_INVALID_ADVALUE && result < RK817_ADC_OVER_ADVALUE)
+	{
+		if (result < rk817->hp_det_adc_value + rk817->hp_adc_drift_scope && 
+	                  result > rk817->hp_det_adc_value - rk817->hp_adc_drift_scope)
+		{
+			if (!rk817->hp_insert){
+				rk817->hp_insert = true;
+				rk817_enable_hp_control(rk817, true);
+				rk817_codec_ctl_gpio(rk817, CODEC_SET_SPK, 0);
+				rk817_codec_ctl_gpio(rk817, CODEC_SET_HP, 1);
+				//extcon_set_state_sync(rk817->edev, EXTCON_JACK_HEADPHONE,true);
+				//snd_soc_jack_report(&rk817->hp_jack, 1, SND_JACK_HEADPHONE);
+			}
+		}else{
+			if (rk817->hp_insert){
+				rk817->hp_insert = false;
+				rk817_enable_hp_control(rk817, false);
+				rk817_codec_ctl_gpio(rk817, CODEC_SET_SPK, 1);
+				rk817_codec_ctl_gpio(rk817, CODEC_SET_HP, 0);
+				//extcon_set_state_sync(rk817->edev, EXTCON_JACK_HEADPHONE,false);
+				//snd_soc_jack_report(&rk817->hp_jack, 0, SND_JACK_HEADPHONE);
+			}
+		}
+		
+	}
+	
+	schedule_delayed_work(&rk817->adc_poll_work, RK817_ADC_SAMPLE_JIFFIES);
+}
+
+static void rk817_hp_det_gpio_poll(struct work_struct *work)
+{
+        struct rk817_codec_priv *rk817;
+
+        rk817 = container_of(work, struct rk817_codec_priv, hp_det_gpio_poll_work.work);
+
+        if( gpio_get_value(rk817->hp_det_gpio))
+        {
+                if(!rk817->hp_insert)
+                {
+                        rk817->hp_insert = true;
+						rk817_enable_hp_control(rk817, true);
+						rk817_codec_ctl_gpio(rk817, CODEC_SET_SPK, 0);
+						rk817_codec_ctl_gpio(rk817, CODEC_SET_HP, 1);
+                        //snd_soc_jack_report(&rk817->hp_jack, SND_JACK_HEADPHONE, SND_JACK_HEADPHONE);
+						//extcon_set_state_sync(rk817->edev, EXTCON_JACK_HEADPHONE,true);
+                }
+        } else
+        {
+                if(rk817->hp_insert)
+                {
+					rk817->hp_insert = false;
+					rk817_enable_hp_control(rk817, false);
+					rk817_codec_ctl_gpio(rk817, CODEC_SET_SPK, 1);
+					rk817_codec_ctl_gpio(rk817, CODEC_SET_HP, 0);
+					//snd_soc_jack_report(&rk817->hp_jack, SND_JACK_HEADPHONE, SND_JACK_HEADPHONE);
+					//extcon_set_state_sync(rk817->edev, EXTCON_JACK_HEADPHONE,false);
+                }
+        }
+
+        schedule_delayed_work(&rk817->hp_det_gpio_poll_work, RK817_ADC_SAMPLE_JIFFIES);
+}
+
 static int rk817_probe(struct snd_soc_component *component)
 {
 	struct rk817_codec_priv *rk817 = snd_soc_component_get_drvdata(component);
-
+	int ret = 0;
 	DBG("%s\n", __func__);
 
 	if (!rk817) {
@@ -1053,6 +1186,26 @@ static int rk817_probe(struct snd_soc_component *component)
 	rk817_reset(component);
 	snd_soc_add_component_controls(component, rk817_snd_path_controls,
 				       ARRAY_SIZE(rk817_snd_path_controls));
+	rk817->hp_insert = false;
+        if (rk817->chan) {
+                //ret=rk817_jack_init(rk817);
+                if(ret<0){
+                	return ret;
+                }
+                INIT_DELAYED_WORK(&rk817->adc_poll_work, rk817_hp_adc_poll);
+                schedule_delayed_work(&rk817->adc_poll_work,
+                                      3000);
+        }
+        else if (gpio_is_valid(rk817->hp_det_gpio)) {
+                //ret=rk817_jack_init(rk817);
+                if(ret<0){
+                	return ret;
+                }
+                INIT_DELAYED_WORK(&rk817->hp_det_gpio_poll_work, rk817_hp_det_gpio_poll);
+                        schedule_delayed_work(&rk817->hp_det_gpio_poll_work,
+                                                  3000);
+        }
+
 	return 0;
 }
 
@@ -1089,7 +1242,12 @@ static int rk817_codec_parse_dt_property(struct device *dev,
 					 struct rk817_codec_priv *rk817)
 {
 	struct device_node *node = dev->parent->of_node;
+	struct iio_channel *chan;
+	struct pinctrl_state    *gpio_state, *default_state;
+	struct pinctrl          *pinctrl;
+	enum of_gpio_flags flags;
 	int ret;
+	u32 adc_value;
 
 	DBG("%s()\n", __func__);
 
@@ -1106,6 +1264,55 @@ static int rk817_codec_parse_dt_property(struct device *dev,
 		return -ENODEV;
 	}
 
+	 chan = iio_channel_get(dev, NULL);
+        if (IS_ERR(chan)) {
+                printk("%s: rk809 have no io-channels defined\n", __func__);
+                chan = NULL;
+        }else {
+        if (!of_property_read_u32(node, "hp-det-adc-value", &adc_value))
+        {
+            rk817->hp_det_adc_value = adc_value;
+			 if (!of_property_read_u32(node, "hp-adc-drift-scope", &adc_value))
+                   rk817->hp_adc_drift_scope = adc_value;
+              else
+                    rk817->hp_adc_drift_scope = RK817_ADC_DRIFT_ADVALUE;
+
+                  printk("%s: rk809 hp adc effective value of detection %d~%d\n", __func__, rk817->hp_det_adc_value-rk817->hp_adc_drift_scope, rk817->hp_det_adc_value+rk817->hp_adc_drift_scope);
+        }
+        else
+        {
+            chan = NULL;
+            printk("%s: rk809 have no hp_det_adc_value defined\n", __func__);
+        }
+	}
+        rk817->chan = chan;
+
+	rk817->hp_det_gpio = of_get_named_gpio_flags(node, "hp-det", 0, &flags);
+        if (!gpio_is_valid(rk817->hp_det_gpio)) {
+                printk("invalid rk817->hp_det_gpio: %d\n",  rk817->hp_det_gpio);
+        }else{
+		gpio_direction_input(rk817->hp_det_gpio);
+                ret = devm_gpio_request(dev, rk817->hp_det_gpio, "hp-det-gpio");
+                if(ret < 0){
+                        gpio_free(rk817->hp_det_gpio);
+                        dev_err(dev, "hp-det request ERROR\n");
+                }
+	}
+
+        rk817->spk_gpio = of_get_named_gpio(node ,"spk-ctl",0);
+        if (!gpio_is_valid(rk817->spk_gpio)) {
+                printk("invalid gpio: %d\n",  rk817->spk_gpio);
+        }else{
+        pinctrl = devm_pinctrl_get(dev);
+	if (!IS_ERR(pinctrl)) {
+		default_state = pinctrl_lookup_state(pinctrl, "default");
+		gpio_state = pinctrl_lookup_state(pinctrl, "spk_gpio");
+		pinctrl_select_state(pinctrl, gpio_state);
+		gpio_request(rk817->spk_gpio, "spk-gpio");
+		gpio_direction_output(rk817->spk_gpio, 0);
+	  }
+	}
+
 	rk817->hp_ctl_gpio = devm_gpiod_get_optional(dev, "hp-ctl",
 						  GPIOD_OUT_LOW);
 	if (!IS_ERR_OR_NULL(rk817->hp_ctl_gpio)) {
@@ -1119,6 +1326,8 @@ static int rk817_codec_parse_dt_property(struct device *dev,
 		DBG("%s : spk-ctl-gpio %d\n", __func__,
 		    desc_to_gpio(rk817->spk_ctl_gpio));
 	}
+
+
 
 	ret = of_property_read_u32(node, "spk-mute-delay-ms",
 				   &rk817->spk_mute_delay);

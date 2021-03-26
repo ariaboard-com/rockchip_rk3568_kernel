@@ -131,6 +131,8 @@
     spk-ctl = <&gpio0 RK_PA6 GPIO_ACTIVE_HIGH>;
     io-channels = <&saradc 3>;
     hp-det-adc-value = <941>;
+    hp_adc_drift_scope = <20>;
+    board-spk-from-hp;
 };
 &spk_ctl_gpio{
 	rockchip,pins = <0 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>;
