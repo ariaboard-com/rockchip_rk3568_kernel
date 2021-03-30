@@ -143,15 +143,16 @@
 };
 
 &pcie2x1 {
-    reset-gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
+    reset-gpios = <&gpio1 RK_PB2 GPIO_ACTIVE_HIGH>;
     pinctrl-names = "default";
     pinctrl-0 = <&pcie_reset_gpio>;
-    /delete-property/ vpcie3v3-supply;
+	vpcie3v3-supply = <&pcie30_3v3>;
     status = "okay";
 };
 
 &pcie30_3v3 {
-	status = "disabled";
+	status = "okay";
+	gpios = <&gpio0 RK_PC4 GPIO_ACTIVE_HIGH>;
 };
 
 &its {
@@ -198,7 +199,7 @@
 
     pcie {
         pcie_reset_gpio: pcie-reset-gpio {
-			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <1 RK_PB2 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
     };
     leds {
