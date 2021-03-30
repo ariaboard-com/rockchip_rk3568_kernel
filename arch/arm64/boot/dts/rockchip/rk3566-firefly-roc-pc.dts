@@ -12,3 +12,8 @@
     model = "Firefly RK3566-ROC-PC HDMI(Linux)";
     compatible = "rockchip,rk3566-firefly-roc-pc", "rockchip,rk3566";
 };
+
+&route_hdmi {
+	status = "okay";
+	connect = <&vp0_out_hdmi>;
+};
