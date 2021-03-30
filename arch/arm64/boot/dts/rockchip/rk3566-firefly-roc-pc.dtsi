@@ -48,14 +48,16 @@
 
 /* USB vbus config  */
 &vcc5v0_host {
-    gpio = <&gpio4 RK_PB0 0>;
+    gpio = <&gpio0 RK_PA6 GPIO_ACTIVE_HIGH>;
     pinctrl-names = "default";
     pinctrl-0 = <&vcc5v0_host_vbus_en>;
 };
 &vcc5v0_otg {
-    gpio = <&gpio0 RK_PD6 0>;
-    pinctrl-names = "default";
-    pinctrl-0 = <&vcc5v0_otg_vbus_en>;
+	status = "disabled";
+};
+
+&u2phy0_otg {
+	/delete-property/ vbus-supply;
 };
 
 /* sdcard config */
@@ -127,7 +129,7 @@
 
 &rk809_codec {
     hp-ctl-gpios = <&gpio4 RK_PC3 GPIO_ACTIVE_HIGH>;
-    spk-ctl = <&gpio0 RK_PA6 GPIO_ACTIVE_HIGH>;
+    //spk-ctl = <&gpio0 RK_PA6 GPIO_ACTIVE_HIGH>;
     io-channels = <&saradc 3>;
     hp-det-adc-value = <941>;
     hp_adc_drift_scope = <20>;
@@ -158,11 +160,8 @@
 
 &pinctrl {
 	usb {
-		vcc5v0_otg_vbus_en: vcc5v0-vbus-en {
-			rockchip,pins = <0 RK_PD6 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
 		vcc5v0_host_vbus_en: vcc5v0-host-en {
-			rockchip,pins = <4 RK_PB0 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <0 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 	sd {
