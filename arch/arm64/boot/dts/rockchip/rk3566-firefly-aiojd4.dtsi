@@ -322,22 +322,3 @@
         };
 };
 
-&jpegd {
-    status = "okay";
-};
-
-&vepu {
-    status = "okay";
-}; 
-
-&vdpu {
-    status = "okay";
-};
-
-&rkvenc {
-    status = "okay";
-};
-
-&rkvdec {
-    status = "okay";
-};
