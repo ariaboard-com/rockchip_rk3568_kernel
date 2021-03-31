@@ -7,6 +7,8 @@
 #include "rk3568-firefly-port.dtsi"
 #include "rk3566-diff.dtsi"
 
+/delete-node/ &hym8563;
+
 / {
     sd_vcc3v3_power: sd-vcc3v3-power {
 		status = "disabled";
@@ -275,6 +277,17 @@
             };
         };
     };
+
+	hym8563: hym8563@51 {
+		status = "okay";
+		compatible = "haoyu,hym8563";
+		reg = <0x51>;
+		#clock-cells = <0>;
+		rtc-irq-gpio = <&gpio0 RK_PC1 IRQ_TYPE_EDGE_FALLING>;
+		clock-frequency = <32768>;
+		//clock-output-names = "xin32k";
+		/* rtc_int is not connected */
+	};
 };
 
 &csi2_dphy_hw {
@@ -324,4 +337,10 @@
                         };
                 };
         };
+};
+
+&rk809 {
+    rtc {
+        status = "disabled";
+    };
 };
