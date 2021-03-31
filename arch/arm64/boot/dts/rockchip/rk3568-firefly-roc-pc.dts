@@ -9,7 +9,7 @@
 #include "rk3568-firefly-roc-pc.dtsi"
 
 / {
-    model = "AIO-3568JD4 HDMI (Linux)";
+    model = "Firefly RK3568-ROC-PC HDMI (Linux)";
     compatible = "rockchip,rk3568-firefly-roc-pc", "rockchip,rk3568";
 
 };
