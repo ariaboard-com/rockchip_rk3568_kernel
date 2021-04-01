@@ -56,7 +56,7 @@
 			label = "firefly:blue:power";
 			linux,default-trigger = "ir-power-click";
 			default-state = "on";
-			gpios = <&gpio0 RK_PC0 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpio1 RK_PB1 GPIO_ACTIVE_HIGH>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&led_power>;
 		};
@@ -68,12 +68,6 @@
 			gpios = <&pca9555 PCA_IO1_2 GPIO_ACTIVE_LOW>;
 		};
 
-		fan_ctl: fan-ctl {
-			label = "firefly:fan_ctl:user";
-			linux,default-trigger = "ir-user-click";
-			default-state = "on";
-			gpios = <&pca9555 PCA_IO1_0 GPIO_ACTIVE_HIGH>;
-		};
     };
 };
 
@@ -309,7 +303,7 @@
 
 	leds {
 	    led_power: led-power {
-	        rockchip,pins = <0 RK_PC0 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <1 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
 	    };
 	};
 };
