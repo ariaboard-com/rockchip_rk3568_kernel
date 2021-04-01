@@ -11,7 +11,7 @@
 	vcc_hub_power: vcc-hub-power-regulator {
 		compatible = "regulator-fixed";
 		enable-active-high;
-		gpio = <&gpio3 RK_PA2 GPIO_ACTIVE_HIGH>;
+		gpio = <&gpio0 RK_PA6 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&vcc_hub_power_en>;
 		regulator-name = "vcc_hub_power_en";
@@ -21,11 +21,11 @@
 	vcc_hub_reset: vcc-hub-reset-regulator {
 		compatible = "regulator-fixed";
 		enable-active-high;
-		gpio = <&gpio3 RK_PA6 GPIO_ACTIVE_HIGH>;
+		gpio = <&gpio1 RK_PA4 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&vcc_hub_reset_en>;
 		regulator-name = "vcc_hub_reset_en";
-		regulator-always-on;
+		regulator-always-off;
 	};
 
     pcie_pi6c_oe: pcie-pi6c-oe-regulator {
@@ -287,11 +287,11 @@
 
 	usb {
 		vcc_hub_power_en: vcc-hub-power-en {
-			rockchip,pins = <3 RK_PA2 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <0 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 
 		vcc_hub_reset_en: vcc-hub-reset-en {
-			rockchip,pins = <3 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <1 RK_PA4 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 
