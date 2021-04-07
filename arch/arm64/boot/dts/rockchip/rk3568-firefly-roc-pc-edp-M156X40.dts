@@ -12,36 +12,10 @@
     model = "ROC-RK3568-PC HDMI+EDP156 (Linux)";
     compatible = "rockchip,rk3568-firefly-roc-pc", "rockchip,rk3568";
 
-	/*vcc3v3_lcd_edp: vcc3v3-lcd-edp {
-		compatible = "regulator-fixed";
-		gpio = <&gpio3 RK_PC3 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
-		regulator-name = "vcc3v3_lcd_edp";
-		regulator-boot-on;
-		regulator-state-mem {
-			regulator-off-in-suspend;
-		};
-	};*/
-
-	vcc3v3_bl_en: vcc3v3-bl-en {
-		compatible = "regulator-fixed";
-		gpio = <&gpio3 RK_PC3 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
-		regulator-name = "vcc3v3_bl_en";
-		regulator-boot-on;
-		regulator-always-on;
-		pinctrl-names = "default";
-		pinctrl-0 = <&vcc3v3_bl_power>;
-		regulator-state-mem {
-			regulator-off-in-suspend;
-		};
-	};
-
     edp_panel: edp-panel {
 		compatible = "simple-panel";
-		//status = "okay";
-		//power-supply = <&vcc3v3_bl_en>;
-        //enable-gpios = <&gpio3 RK_PC3 GPIO_ACTIVE_HIGH>;	
+		status = "okay";
+        enable-gpios = <&gpio3 RK_PC3 GPIO_ACTIVE_HIGH>;
 		//bus-format = <MEDIA_BUS_FMT_RGB888_1X24>;
 		backlight = <&backlight>;
 		prepare-delay-ms = <20>;
@@ -113,7 +87,6 @@
 			240 241 242 243 244 245 246 247
 			248 249 250 251 252 253 254 255>;
 		default-brightness-level = <200>;
-		//enable-gpios = <&gpio3 RK_PC3 GPIO_ACTIVE_HIGH>;
     };
 };
 
@@ -161,10 +134,3 @@
 	status = "disabled";
 };
 
-&pinctrl {
-	lcd {
-		vcc3v3_bl_power: vc3v3-bl-power {
-			rockchip,pins = <3 RK_PC3 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-	};
-};
