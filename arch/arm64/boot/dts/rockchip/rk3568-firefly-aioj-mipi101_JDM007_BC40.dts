@@ -6,11 +6,11 @@
 
 /dts-v1/;
 
-#include "rk3568-firefly-aiojd4.dtsi"
+#include "rk3568-firefly-aioj.dtsi"
 
 / {
-    model = "AIO-3568JD4 MIPI JDM007_BC40 (Linux)";
-    compatible = "rockchip,rk3568-firefly-aiojd4", "rockchip,rk3568";
+    model = "AIO-3568J MIPI JDM007_BC40 (Linux)";
+    compatible = "rockchip,rk3568-firefly-aioj", "rockchip,rk3568";
 
     backlight: backlight {
 		status = "okay";

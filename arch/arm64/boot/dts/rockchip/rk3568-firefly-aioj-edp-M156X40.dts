@@ -6,11 +6,11 @@
 
  /dts-v1/;
 
-#include "rk3568-firefly-aiojd4.dtsi"
+#include "rk3568-firefly-aioj.dtsi"
 
 / {
-    model = "AIO-3568JD4 HDMI+EDP156 (Linux)";
-    compatible = "rockchip,rk3568-firefly-aiojd4-edp-m156x40", "rockchip,rk3568";
+    model = "AIO-3568J HDMI+EDP156 (Linux)";
+    compatible = "rockchip,rk3568-firefly-aioj-edp-m156x40", "rockchip,rk3568";
 
 	vcc3v3_lcd_edp: vcc3v3-lcd-edp {
 		compatible = "regulator-fixed";
