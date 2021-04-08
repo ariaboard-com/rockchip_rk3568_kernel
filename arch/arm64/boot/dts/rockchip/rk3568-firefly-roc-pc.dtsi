@@ -63,7 +63,7 @@
 		compatible = "gpio-leds";
 
 		power_led: power {
-			label = "firefly:blue:power";
+			label = "firefly:red:power";
 			linux,default-trigger = "ir-power-click";
 			default-state = "on";
 			gpios = <&gpio1 RK_PB1 GPIO_ACTIVE_HIGH>;
@@ -71,12 +71,24 @@
 			pinctrl-0 = <&led_power>;
 		};
 
-		user_led: user {
-			label = "firefly:yellow:user";
-			linux,default-trigger = "ir-user-click";
+		user_led0: diy0 {
+			label = "firefly:green:diy0";
+			linux,default-trigger = "ir-diy0-click";
 			default-state = "off";
-			gpios = <&pca9555 PCA_IO1_2 GPIO_ACTIVE_LOW>;
+			gpios = <&gpio1 RK_PB0 GPIO_ACTIVE_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&led_diy0>;
 		};
+
+		user_led1: diy1 {
+			label = "firefly:blue:diy1";
+			linux,default-trigger = "ir-diy1-click";
+			default-state = "off";
+			gpios = <&gpio1 RK_PB2 GPIO_ACTIVE_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&led_diy1>;
+		};
+
 
     };
 };
@@ -259,6 +271,10 @@
 	status = "okay";
 };
 
+&wireless_bluetooth {
+	status = "okay";
+};
+
 &spdif_8ch{
     status = "disabled";
 };
@@ -312,6 +328,14 @@
 	leds {
 	    led_power: led-power {
 			rockchip,pins = <1 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
+	    };
+
+	    led_diy0: led-diy0 {
+			rockchip,pins = <1 RK_PB0 RK_FUNC_GPIO &pcfg_pull_none>;
+	    };
+
+	    led_diy1: led-diy1 {
+			rockchip,pins = <1 RK_PB2 RK_FUNC_GPIO &pcfg_pull_none>;
 	    };
 	};
 };
