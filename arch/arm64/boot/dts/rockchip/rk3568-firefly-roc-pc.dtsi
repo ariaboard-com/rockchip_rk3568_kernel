@@ -135,7 +135,7 @@
 &i2c4 {
 	status = "okay";
 	XC7022b: XC7022b@1b {
-		 status = "disabled";
+		 status = "okay";
 		 compatible = "firefly,xc7022";
 		 reg = <0x1b>;
 		 clocks = <&cru CLK_CIF_OUT>;
@@ -144,9 +144,9 @@
 		 pinctrl-names = "rockchip,camera_default";
 		 pinctrl-0 = <&cif_clk>;
 
-		 power-gpios = <&pca9555 PCA_IO0_2 GPIO_ACTIVE_HIGH>;
-		 reset-gpios = <&pca9555 PCA_IO0_0 GPIO_ACTIVE_HIGH>;
-		 pwdn-gpios = <&pca9555 PCA_IO0_1 GPIO_ACTIVE_HIGH>;
+		 power-gpios = <&gpio0 RK_PC1 GPIO_ACTIVE_HIGH>;
+		 reset-gpios = <&gpio0 RK_PD5 GPIO_ACTIVE_HIGH>;
+		 pwdn-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_HIGH>;
 
 		 firefly,clkout-enabled-index = <0>;
 		 rockchip,camera-module-index = <1>;
@@ -213,11 +213,11 @@
 };
 
 &spi1 {
-	status = "disabled";
+	status = "okay";
 };
 
 &spi_wk2xxx {
-	status = "disabled";
+	status = "okay";
 };
 
 &pcie30phy {
