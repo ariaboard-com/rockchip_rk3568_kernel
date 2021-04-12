@@ -617,7 +617,7 @@
 };
 
 &rknpu_mmu {
-	status = "disabled";
+	status = "okay";
 };
 
 &saradc {
