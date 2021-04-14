@@ -213,11 +213,11 @@
 };
 
 &spi1 {
-	status = "okay";
+	status = "disabled";
 };
 
 &spi_wk2xxx {
-	status = "okay";
+	status = "disabled";
 };
 
 &pcie30phy {
