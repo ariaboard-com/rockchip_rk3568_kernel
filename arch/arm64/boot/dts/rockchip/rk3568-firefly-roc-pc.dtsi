@@ -297,6 +297,10 @@
 	status = "okay";
 };
 
+&vcc3v3_vga {
+	status = "disabled";
+};
+
 &pinctrl {
 
 	usb {
