@@ -32,6 +32,11 @@ u32 rkisp_read(struct rkisp_device *dev, u32 reg, bool is_direct)
 	return val;
 }
 
+u32 rkisp_read_reg_cache(struct rkisp_device *dev, u32 reg)
+{
+	return *(u32 *)(dev->sw_base_addr + reg);
+}
+
 void rkisp_set_bits(struct rkisp_device *dev, u32 reg, u32 mask, u32 val, bool is_direct)
 {
 	u32 tmp = rkisp_read(dev, reg, is_direct) & ~mask;
@@ -227,8 +232,8 @@ static int rkisp_alloc_page_dummy_buf(struct rkisp_device *dev, u32 size)
 	dummy_buf->mem_priv = sg;
 	dummy_buf->pages = pages;
 	v4l2_dbg(1, rkisp_debug, &dev->v4l2_dev,
-		 "%s buf:0x%x map cnt:%d\n", __func__,
-		 (u32)dummy_buf->dma_addr, ret);
+		 "%s buf:0x%x map cnt:%d size:%d\n", __func__,
+		 (u32)dummy_buf->dma_addr, ret, size);
 	return 0;
 free_sg:
 	kfree(sg);
@@ -269,6 +274,8 @@ int rkisp_alloc_common_dummy_buf(struct rkisp_device *dev)
 	if (dummy_buf->mem_priv)
 		goto end;
 
+	if (hw->max_in.w && hw->max_in.h)
+		size = hw->max_in.w * hw->max_in.h * 2;
 	for (i = 0; i < hw->dev_num; i++) {
 		isp = hw->isp[i];
 		for (j = 0; j < RKISP_MAX_STREAM; j++) {

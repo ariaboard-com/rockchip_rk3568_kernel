@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/* SPDX-License-Identifier: ((GPL-2.0+ WITH Linux-syscall-note) OR MIT)
  *
  * Copyright (C) 2019 Rockchip Electronics Co., Ltd.
  */
@@ -9,7 +9,7 @@
 #include <linux/types.h>
 #include <linux/v4l2-controls.h>
 
-#define RKCIF_API_VERSION		KERNEL_VERSION(0, 1, 0x9)
+#define RKCIF_API_VERSION		KERNEL_VERSION(0, 1, 0xa)
 
 #define V4L2_CID_CIF_DATA_COMPACT	(V4L2_CID_PRIVATE_BASE + 0)
 

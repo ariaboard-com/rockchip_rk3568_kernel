@@ -65,9 +65,16 @@
 #define RGA2_TEST_FLUSH_TIME 0
 #define RGA2_INFO_BUS_ERROR 1
 #define RGA2_POWER_OFF_DELAY	4*HZ /* 4s */
-#define RGA2_TIMEOUT_DELAY	(HZ / 5) /* 200ms */
+#define RGA2_TIMEOUT_DELAY	(HZ / 2) /* 500ms */
 #define RGA2_MAJOR		255
 #define RGA2_RESET_TIMEOUT	1000
+/*
+ * The maximum input is 8192*8192, the maximum output is 4096*4096
+ * The size of physical pages requested is:
+ * ( ( maximum_input_value * maximum_input_value * format_bpp ) / 4K_page_size ) + 1
+ */
+#define RGA2_PHY_PAGE_SIZE	(((8192 * 8192 * 4) / 4096) + 1)
+
 
 /* Driver information */
 #define DRIVER_DESC		"RGA2 Device Driver"
@@ -769,7 +776,7 @@ static int rga2_check_param(const struct rga2_req *req)
 {
 	if(!((req->render_mode == color_fill_mode)))
 	{
-	    if (unlikely((req->src.act_w <= 0) || (req->src.act_w > 8191) || (req->src.act_h <= 0) || (req->src.act_h > 8191)))
+	    if (unlikely((req->src.act_w <= 0) || (req->src.act_w > 8192) || (req->src.act_h <= 0) || (req->src.act_h > 8192)))
 	    {
 		printk("invalid source resolution act_w = %d, act_h = %d\n", req->src.act_w, req->src.act_h);
 		return -EINVAL;
@@ -778,7 +785,7 @@ static int rga2_check_param(const struct rga2_req *req)
 
 	if(!((req->render_mode == color_fill_mode)))
 	{
-	    if (unlikely((req->src.vir_w <= 0) || (req->src.vir_w > 8191) || (req->src.vir_h <= 0) || (req->src.vir_h > 8191)))
+	    if (unlikely((req->src.vir_w <= 0) || (req->src.vir_w > 8192) || (req->src.vir_h <= 0) || (req->src.vir_h > 8192)))
 	    {
 		printk("invalid source resolution vir_w = %d, vir_h = %d\n", req->src.vir_w, req->src.vir_h);
 		return -EINVAL;
@@ -839,9 +846,12 @@ static void rga2_copy_reg(struct rga2_reg *reg, uint32_t offset)
 static struct rga2_reg * rga2_reg_init(rga2_session *session, struct rga2_req *req)
 {
     int32_t ret;
-	struct rga2_reg *reg = kzalloc(sizeof(struct rga2_reg), GFP_KERNEL);
+
+	/* Alloc 4k size for rga2_reg use. */
+	struct rga2_reg *reg = (struct rga2_reg *)get_zeroed_page(GFP_KERNEL | GFP_DMA32);
+
 	if (NULL == reg) {
-		pr_err("kmalloc fail in rga_reg_init\n");
+		pr_err("get_zeroed_page fail in rga_reg_init\n");
 		return NULL;
 	}
 
@@ -849,15 +859,13 @@ static struct rga2_reg * rga2_reg_init(rga2_session *session, struct rga2_req *r
 	INIT_LIST_HEAD(&reg->session_link);
 	INIT_LIST_HEAD(&reg->status_link);
 
-    reg->MMU_base = NULL;
-
     if ((req->mmu_info.src0_mmu_flag & 1) || (req->mmu_info.src1_mmu_flag & 1)
         || (req->mmu_info.dst_mmu_flag & 1) || (req->mmu_info.els_mmu_flag & 1))
     {
         ret = rga2_set_mmu_info(reg, req);
         if(ret < 0) {
             printk("%s, [%d] set mmu info error \n", __FUNCTION__, __LINE__);
-            kfree(reg);
+            free_page((unsigned long)reg);
 
             return NULL;
         }
@@ -865,7 +873,7 @@ static struct rga2_reg * rga2_reg_init(rga2_session *session, struct rga2_req *r
 
     if(RGA2_gen_reg_info((uint8_t *)reg->cmd_reg, req) == -1) {
         printk("gen reg info error\n");
-        kfree(reg);
+        free_page((unsigned long)reg);
 
         return NULL;
     }
@@ -894,7 +902,7 @@ static void rga2_reg_deinit(struct rga2_reg *reg)
 {
 	list_del_init(&reg->session_link);
 	list_del_init(&reg->status_link);
-	kfree(reg);
+	free_page((unsigned long)reg);
 }
 
 /* Caller must hold rga_service.lock */
@@ -1425,7 +1433,8 @@ static int rga2_convert_dma_buf(struct rga2_req *req)
 static int rga2_blit_flush_cache(rga2_session *session, struct rga2_req *req)
 {
 	int ret = 0;
-	struct rga2_reg *reg = kzalloc(sizeof(*reg), GFP_KERNEL);
+	/* Alloc 4k size for rga2_reg use. */
+	struct rga2_reg *reg = (struct rga2_reg *)get_zeroed_page(GFP_KERNEL | GFP_DMA32);
 	struct rga2_mmu_buf_t *tbuf = &rga2_mmu_buf;
 
 	if (!reg) {
@@ -1463,7 +1472,7 @@ static int rga2_blit_flush_cache(rga2_session *session, struct rga2_req *req)
 			tbuf->back += reg->MMU_len;
 	}
 err_free_reg:
-	kfree(reg);
+	free_page((unsigned long)reg);
 
 	return ret;
 }
@@ -1485,7 +1494,6 @@ static int rga2_blit(rga2_session *session, struct rga2_req *req)
 		return -EFAULT;
 	}
 #endif
-
 	do {
 		/* check value if legal */
 		ret = rga2_check_param(req);
@@ -2065,12 +2073,24 @@ static void RGA2_flush_page(void)
 
 	if (reg == NULL)
 		return;
-	if (reg->MMU_base == NULL)
-		return;
 
-	for (i = 0; i < reg->MMU_count; i++)
-		rga2_dma_flush_page(phys_to_page(reg->MMU_base[i]),
-				    MMU_UNMAP_INVALID);
+	if (reg->MMU_src0_base != NULL) {
+		for (i = 0; i < reg->MMU_src0_count; i++)
+			rga2_dma_flush_page(phys_to_page(reg->MMU_src0_base[i]),
+					    MMU_UNMAP_CLEAN);
+	}
+
+	if (reg->MMU_src1_base != NULL) {
+		for (i = 0; i < reg->MMU_src1_count; i++)
+			rga2_dma_flush_page(phys_to_page(reg->MMU_src1_base[i]),
+					    MMU_UNMAP_CLEAN);
+	}
+
+	if (reg->MMU_dst_base != NULL) {
+		for (i = 0; i < reg->MMU_dst_count; i++)
+			rga2_dma_flush_page(phys_to_page(reg->MMU_dst_base[i]),
+					    MMU_UNMAP_INVALID);
+	}
 }
 
 static irqreturn_t rga2_irq_thread(int irq, void *dev_id)
@@ -2600,12 +2620,22 @@ void rga2_test_0(void);
 static int __init rga2_init(void)
 {
 	int ret;
+	int order = 0;
 	uint32_t *buf_p;
 	uint32_t *buf;
 
-	/* malloc pre scale mid buf mmu table */
-	buf_p = kmalloc(1024*256, GFP_KERNEL);
+	/*
+	 * malloc pre scale mid buf mmu table:
+	 * RGA2_PHY_PAGE_SIZE * channel_num * address_size
+	 */
+	order = get_order(RGA2_PHY_PAGE_SIZE * 3 * sizeof(buf_p));
+	buf_p = (uint32_t *)__get_free_pages(GFP_KERNEL | GFP_DMA32, order);
+	if (buf_p == NULL) {
+		ERR("Can not alloc pages for mmu_page_table\n");
+	}
+
 	rga2_mmu_buf.buf_virtual = buf_p;
+	rga2_mmu_buf.buf_order = order;
 #if (defined(CONFIG_ARM) && defined(CONFIG_ARM_LPAE))
 	buf = (uint32_t *)(uint32_t)virt_to_phys((void *)((unsigned long)buf_p));
 #else
@@ -2613,10 +2643,15 @@ static int __init rga2_init(void)
 #endif
 	rga2_mmu_buf.buf = buf;
 	rga2_mmu_buf.front = 0;
-	rga2_mmu_buf.back = 64*1024;
-	rga2_mmu_buf.size = 64*1024;
+	rga2_mmu_buf.back = RGA2_PHY_PAGE_SIZE * 3;
+	rga2_mmu_buf.size = RGA2_PHY_PAGE_SIZE * 3;
 
-	rga2_mmu_buf.pages = kmalloc(32768 * sizeof(struct page *), GFP_KERNEL);
+	order = get_order(RGA2_PHY_PAGE_SIZE * sizeof(struct page *));
+	rga2_mmu_buf.pages = (struct page **)__get_free_pages(GFP_KERNEL | GFP_DMA32, order);
+	if (rga2_mmu_buf.pages == NULL) {
+		ERR("Can not alloc pages for rga2_mmu_buf.pages\n");
+	}
+	rga2_mmu_buf.pages_order = order;
 
 	ret = platform_driver_register(&rga2_driver);
 	if (ret != 0) {
@@ -2655,7 +2690,8 @@ static void __exit rga2_exit(void)
 {
 	rga2_power_off();
 
-	kfree(rga2_mmu_buf.buf_virtual);
+	free_pages((unsigned long)rga2_mmu_buf.buf_virtual, rga2_mmu_buf.buf_order);
+	free_pages((unsigned long)rga2_mmu_buf.pages, rga2_mmu_buf.pages_order);
 
 	platform_driver_unregister(&rga2_driver);
 }

@@ -142,13 +142,12 @@ struct rockchip_dmcfreq {
 	unsigned long video_4k_rate;
 	unsigned long video_4k_10b_rate;
 	unsigned long performance_rate;
-	unsigned long dualview_rate;
 	unsigned long hdmi_rate;
 	unsigned long idle_rate;
 	unsigned long suspend_rate;
 	unsigned long reboot_rate;
 	unsigned long boost_rate;
-	unsigned long isp_rate;
+	unsigned long fixed_rate;
 	unsigned long low_power_rate;
 	unsigned long vop_req_rate;
 
@@ -179,6 +178,18 @@ struct rockchip_dmcfreq {
 static struct pm_qos_request pm_qos;
 
 static DECLARE_RWSEM(rockchip_dmcfreq_sem);
+
+static inline unsigned long is_dualview(unsigned long status)
+{
+	return (status & SYS_STATUS_LCDC0) && (status & SYS_STATUS_LCDC1);
+}
+
+static inline unsigned long is_isp(unsigned long status)
+{
+	return (status & SYS_STATUS_ISP) ||
+	       (status & SYS_STATUS_CIF0) ||
+	       (status & SYS_STATUS_CIF1);
+}
 
 void rockchip_dmcfreq_lock(void)
 {
@@ -1952,6 +1963,7 @@ static int rockchip_get_system_status_rate(struct device_node *np,
 {
 	const struct property *prop;
 	unsigned int status = 0, freq = 0;
+	unsigned long temp_rate = 0;
 	int count, i;
 
 	prop = of_find_property(np, porp_name, NULL);
@@ -1992,9 +2004,6 @@ static int rockchip_get_system_status_rate(struct device_node *np,
 		case SYS_STATUS_PERFORMANCE:
 			dmcfreq->performance_rate = freq * 1000;
 			break;
-		case SYS_STATUS_LCDC0 | SYS_STATUS_LCDC1:
-			dmcfreq->dualview_rate = freq * 1000;
-			break;
 		case SYS_STATUS_HDMI:
 			dmcfreq->hdmi_rate = freq * 1000;
 			break;
@@ -2008,7 +2017,12 @@ static int rockchip_get_system_status_rate(struct device_node *np,
 			dmcfreq->boost_rate = freq * 1000;
 			break;
 		case SYS_STATUS_ISP:
-			dmcfreq->isp_rate = freq * 1000;
+		case SYS_STATUS_CIF0:
+		case SYS_STATUS_CIF1:
+		case SYS_STATUS_DUALVIEW:
+			temp_rate = freq * 1000;
+			if (dmcfreq->fixed_rate < temp_rate)
+				dmcfreq->fixed_rate = temp_rate;
 			break;
 		case SYS_STATUS_LOW_POWER:
 			dmcfreq->low_power_rate = freq * 1000;
@@ -2047,22 +2061,11 @@ static int rockchip_dmcfreq_system_status_notifier(struct notifier_block *nb,
 	unsigned int refresh = false;
 	bool is_fixed = false;
 
-	if (dmcfreq->dualview_rate && dmcfreq->isp_rate &&
-	    (status & SYS_STATUS_ISP) &&
-	    (status & SYS_STATUS_LCDC0) &&
-	    (status & SYS_STATUS_LCDC1))
-		return NOTIFY_OK;
-
-	if (dmcfreq->dualview_rate && (status & SYS_STATUS_LCDC0) &&
-	    (status & SYS_STATUS_LCDC1)) {
-		target_rate = dmcfreq->dualview_rate;
+	if (dmcfreq->fixed_rate && (is_dualview(status) || is_isp(status))) {
+		if (dmcfreq->is_fixed)
+			return NOTIFY_OK;
 		is_fixed = true;
-		goto next;
-	}
-
-	if (dmcfreq->isp_rate && (status & SYS_STATUS_ISP)) {
-		target_rate = dmcfreq->isp_rate;
-		is_fixed = true;
+		target_rate = dmcfreq->fixed_rate;
 		goto next;
 	}
 
@@ -2906,7 +2909,7 @@ rockchip_dmcfreq_register_cooling_device(struct rockchip_dmcfreq *dmcfreq)
 		of_devfreq_cooling_register_power(dmcfreq->dev->of_node,
 						  dmcfreq->devfreq,
 						  &ddr_cooling_power_data);
-	if (IS_ERR_OR_NULL(dmcfreq->devfreq_cooling)) {
+	if (IS_ERR(dmcfreq->devfreq_cooling)) {
 		ret = PTR_ERR(dmcfreq->devfreq_cooling);
 		dev_err(dmcfreq->dev,
 			"Failed to register cooling device (%d)\n",

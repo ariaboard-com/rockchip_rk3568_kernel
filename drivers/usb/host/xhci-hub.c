@@ -1568,7 +1568,21 @@ retry:
 			t2 &= ~PORT_PLS_MASK;
 			t2 |= PORT_LINK_STROBE | XDEV_U3;
 			set_bit(port_index, &bus_state->bus_suspended);
+		} else if ((xhci->quirks & XHCI_U2_BROKEN_SUSPEND) &&
+			   (hcd->speed < HCD_USB3) &&
+			   (t1 & PORT_PLS_MASK) == XDEV_U3) {
+			/*
+			 * Rockchip SNPS xHC 3.0 set USB 2.0 PHY enter
+			 * suspend mode from DWC3 core if the suspend
+			 * conditions are valid. In this case, it need
+			 * to set the bus_suspended bit for USB 2.0, so
+			 * that in xhci_bus_resume, it can set the xHC
+			 * link state to XDEV_RESUME and send USB resume
+			 * signal to USB 2.0 device.
+			 */
+			set_bit(port_index, &bus_state->bus_suspended);
 		}
+
 		/* USB core sets remote wake mask for USB 3.0 hubs,
 		 * including the USB 3.0 roothub, but only if CONFIG_PM
 		 * is enabled, so also enable remote wake here.
@@ -1617,6 +1631,10 @@ retry:
 	hcd->state = HC_STATE_SUSPENDED;
 	bus_state->next_statechange = jiffies + msecs_to_jiffies(10);
 	spin_unlock_irqrestore(&xhci->lock, flags);
+
+	if (bus_state->bus_suspended)
+		usleep_range(5000, 10000);
+
 	return 0;
 }
 

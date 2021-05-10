@@ -2835,6 +2835,8 @@ static void queue_trb(struct xhci_hcd *xhci, struct xhci_ring *ring,
 	trb->field[0] = cpu_to_le32(field1);
 	trb->field[1] = cpu_to_le32(field2);
 	trb->field[2] = cpu_to_le32(field3);
+	/* make sure TRB is fully written before giving it to the controller */
+	wmb();
 	trb->field[3] = cpu_to_le32(field4);
 
 	trace_xhci_queue_trb(ring, trb);
@@ -3289,15 +3291,17 @@ int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 			first_trb = false;
 			if (start_cycle == 0)
 				field |= TRB_CYCLE;
-			/*
-			 * Don't enable the ENT flag in the TRB if the
-			 * transfer length of the first TRB isn't an
-			 * integer multiple of the EP maxpacket.
-			 */
-			if (trb_buff_len % usb_endpoint_maxp(&urb->ep->desc))
-				en_trb_ent = false;
 		} else
 			field |= ring->cycle_state;
+
+		/*
+		 * Don't enable the ENT flag in the TRB if the
+		 * transfer length of the TRB isn't an integer
+		 * multiple of the EP maxpacket.
+		 */
+		if (en_trb_ent &&
+		    (trb_buff_len % usb_endpoint_maxp(&urb->ep->desc)))
+			en_trb_ent = false;
 
 		/* Chain all the TRBs together; clear the chain bit in the last
 		 * TRB to indicate it's the last TRB in the chain.

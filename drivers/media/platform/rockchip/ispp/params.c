@@ -192,7 +192,7 @@ static void nr_config(struct rkispp_params_vdev *params_vdev,
 		      struct rkispp_nr_config *arg)
 {
 	u32 i, val;
-	u8 big_en, nobig_en;
+	u8 big_en, nobig_en, sd32_self_en = 0;
 
 	rkispp_write(params_vdev->dev, RKISPP_NR_UVNR_GAIN_1SIGMA,
 		arg->uvnr_gain_1sigma);
@@ -320,8 +320,11 @@ static void nr_config(struct rkispp_params_vdev *params_vdev,
 		nobig_en = 0;
 	}
 
+	if (params_vdev->dev->hw_dev->is_single)
+		sd32_self_en = arg->uvnr_sd32_self_en;
 	val = arg->uvnr_step1_en << 1 | arg->uvnr_step2_en << 2 |
-	      arg->nr_gain_en << 3 | nobig_en << 5 | big_en << 6;
+	      arg->nr_gain_en << 3 | sd32_self_en << 4 |
+	      nobig_en << 5 | big_en << 6;
 	rkispp_set_bits(params_vdev->dev, RKISPP_NR_UVNR_CTRL_PARA,
 			SW_UVNR_STEP1_ON | SW_UVNR_STEP2_ON |
 			SW_NR_GAIN_BYPASS | SW_UVNR_NOBIG_EN |
@@ -546,6 +549,8 @@ static void fec_config(struct rkispp_params_vdev *params_vdev,
 	fec_data = (struct rkispp_fec_head *)params_vdev->buf_fec[buf_idx].vaddr;
 	fec_data->stat = FEC_BUF_CHIPINUSE;
 	params_vdev->buf_fec_idx = buf_idx;
+
+	rkispp_prepare_buffer(dev, &params_vdev->buf_fec[buf_idx]);
 
 	dma_addr = params_vdev->buf_fec[buf_idx].dma_addr;
 	val = dma_addr + fec_data->meshxf_oft;
@@ -914,6 +919,22 @@ rkispp_params_init_vb2_queue(struct vb2_queue *q,
 	return vb2_queue_init(q);
 }
 
+static void fec_data_abandon(struct rkispp_params_vdev *vdev,
+			     struct rkispp_params_cfg *params)
+{
+	struct rkispp_fec_head *data;
+	int i;
+
+	for (i = 0; i < FEC_MESH_BUF_NUM; i++) {
+		if (params->fec_cfg.buf_fd == vdev->buf_fec[i].dma_fd) {
+			data = (struct rkispp_fec_head *)vdev->buf_fec[i].vaddr;
+			if (data)
+				data->stat = FEC_BUF_INIT;
+			break;
+		}
+	}
+}
+
 void rkispp_params_cfg(struct rkispp_params_vdev *params_vdev, u32 frame_id)
 {
 	struct rkispp_params_cfg *new_params = NULL;
@@ -932,6 +953,8 @@ void rkispp_params_cfg(struct rkispp_params_vdev *params_vdev, u32 frame_id)
 
 		new_params = (struct rkispp_params_cfg *)(params_vdev->cur_buf->vaddr[0]);
 		if (new_params->frame_id < frame_id) {
+			if (new_params->module_cfg_update & ISPP_MODULE_FEC)
+				fec_data_abandon(params_vdev, new_params);
 			list_del(&params_vdev->cur_buf->queue);
 			vb2_buffer_done(&params_vdev->cur_buf->vb.vb2_buf, VB2_BUF_STATE_DONE);
 			params_vdev->cur_buf = NULL;

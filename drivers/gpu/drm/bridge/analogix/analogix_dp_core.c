@@ -204,6 +204,9 @@ static int analogix_dp_detect_sink_psr(struct analogix_dp_device *dp)
 	unsigned char psr_version;
 	int ret;
 
+	if (!of_property_read_bool(dp->dev->of_node, "support-psr"))
+		return 0;
+
 	ret = drm_dp_dpcd_readb(&dp->aux, DP_PSR_SUPPORT, &psr_version);
 	if (ret != 1) {
 		dev_err(dp->dev, "failed to get PSR version, disable it\n");
@@ -1301,6 +1304,7 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
 	if (dp->plat_data->power_off)
 		dp->plat_data->power_off(dp->plat_data);
 
+	analogix_dp_reset_aux(dp);
 	analogix_dp_set_analog_power_down(dp, POWER_ALL, 1);
 	analogix_dp_phy_power_off(dp);
 

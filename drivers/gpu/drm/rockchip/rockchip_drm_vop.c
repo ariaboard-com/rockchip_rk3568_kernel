@@ -1663,6 +1663,14 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
 	vop = to_vop(crtc);
 	vop_data = vop->data;
 
+	if (state->src_w >> 16 < 4 || state->src_h >> 16 < 4 ||
+	    state->crtc_w < 4 || state->crtc_h < 4) {
+		DRM_ERROR("Invalid size: %dx%d->%dx%d, min size is 4x4\n",
+			  state->src_w >> 16, state->src_h >> 16,
+			  state->crtc_w, state->crtc_h);
+		return -EINVAL;
+	}
+
 	if (drm_rect_width(src) >> 16 > vop_data->max_input.width ||
 	    drm_rect_height(src) >> 16 > vop_data->max_input.height) {
 		DRM_ERROR("Invalid source: %dx%d. max input: %dx%d\n",
@@ -2997,6 +3005,7 @@ static void vop_crtc_atomic_enable(struct drm_crtc *crtc,
 			VOP_CTRL_SET(vop, bt1120_en, 1);
 			yc_swap = is_yc_swap(s->bus_format);
 			VOP_CTRL_SET(vop, bt1120_yc_swap, yc_swap);
+			VOP_CTRL_SET(vop, yuv_clip, 1);
 		}
 		break;
 	case DRM_MODE_CONNECTOR_eDP:
@@ -3510,28 +3519,48 @@ static void vop_tv_config_update(struct drm_crtc *crtc,
 	}
 
 	if (vop_data->feature & VOP_FEATURE_OUTPUT_10BIT)
-		brightness = interpolate(0, -128, 100, 127,
-					 s->tv_state->brightness);
+		brightness = interpolate(0, -128, 100, 127, s->tv_state->brightness);
+	else if (VOP_MAJOR(vop->version) == 2 && VOP_MINOR(vop->version) == 6) /* px30 vopb */
+		brightness = interpolate(0, -64, 100, 63, s->tv_state->brightness);
 	else
-		brightness = interpolate(0, -32, 100, 31,
-					 s->tv_state->brightness);
-	contrast = interpolate(0, 0, 100, 511, s->tv_state->contrast);
-	saturation = interpolate(0, 0, 100, 511, s->tv_state->saturation);
-	hue = interpolate(0, -30, 100, 30, s->tv_state->hue);
+		brightness = interpolate(0, -32, 100, 31, s->tv_state->brightness);
 
-	/*
-	 *  a:[-30~0]:
-	 *    sin_hue = 0x100 - sin(a)*256;
-	 *    cos_hue = cos(a)*256;
-	 *  a:[0~30]
-	 *    sin_hue = sin(a)*256;
-	 *    cos_hue = cos(a)*256;
-	 */
-	sin_hue = fixp_sin32(hue) >> 23;
-	cos_hue = fixp_cos32(hue) >> 23;
+	if ((VOP_MAJOR(vop->version) == 3) ||
+	    (VOP_MAJOR(vop->version) == 2 && VOP_MINOR(vop->version) == 6)) { /* px30 vopb */
+		contrast = interpolate(0, 0, 100, 511, s->tv_state->contrast);
+		saturation = interpolate(0, 0, 100, 511, s->tv_state->saturation);
+		/*
+		 *  a:[-30~0]:
+		 *    sin_hue = 0x100 - sin(a)*256;
+		 *    cos_hue = cos(a)*256;
+		 *  a:[0~30]
+		 *    sin_hue = sin(a)*256;
+		 *    cos_hue = cos(a)*256;
+		 */
+		hue = interpolate(0, -30, 100, 30, s->tv_state->hue);
+		sin_hue = fixp_sin32(hue) >> 23;
+		cos_hue = fixp_cos32(hue) >> 23;
+		VOP_CTRL_SET(vop, bcsh_sat_con, saturation * contrast / 0x100);
+
+	} else {
+		contrast = interpolate(0, 0, 100, 255, s->tv_state->contrast);
+		saturation = interpolate(0, 0, 100, 255, s->tv_state->saturation);
+		/*
+		 *  a:[-30~0]:
+		 *    sin_hue = 0x100 - sin(a)*128;
+		 *    cos_hue = cos(a)*128;
+		 *  a:[0~30]
+		 *    sin_hue = sin(a)*128;
+		 *    cos_hue = cos(a)*128;
+		 */
+		hue = interpolate(0, -30, 100, 30, s->tv_state->hue);
+		sin_hue = fixp_sin32(hue) >> 24;
+		cos_hue = fixp_cos32(hue) >> 24;
+		VOP_CTRL_SET(vop, bcsh_sat_con, saturation * contrast / 0x80);
+	}
+
 	VOP_CTRL_SET(vop, bcsh_brightness, brightness);
 	VOP_CTRL_SET(vop, bcsh_contrast, contrast);
-	VOP_CTRL_SET(vop, bcsh_sat_con, saturation * contrast / 0x100);
 	VOP_CTRL_SET(vop, bcsh_sin_hue, sin_hue);
 	VOP_CTRL_SET(vop, bcsh_cos_hue, cos_hue);
 	VOP_CTRL_SET(vop, bcsh_out_mode, BCSH_OUT_MODE_NORMAL_VIDEO);

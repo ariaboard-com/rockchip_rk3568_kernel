@@ -41,6 +41,10 @@
 		i2c3 = &i2c3;
 		i2c4 = &i2c4;
 		i2c5 = &i2c5;
+		mmc0 = &sdhci;
+		mmc1 = &sdmmc0;
+		mmc2 = &sdmmc1;
+		mmc3 = &sdmmc2;
 		serial0 = &uart0;
 		serial1 = &uart1;
 		serial2 = &uart2;
@@ -132,7 +136,7 @@
 		rockchip,low-temp = <0>;
 		rockchip,low-temp-adjust-volt = <
 			/* MHz    MHz    uV */
-			1104      1104   75000
+			1104      1608   75000
 		>;
 
 		nvmem-cells = <&cpu_leakage>;
@@ -412,6 +416,34 @@
 		clock-frequency = <125000000>;
 		clock-output-names = "clk_gmac1_xpcs_mii";
 		#clock-cells = <0>;
+	};
+
+	i2s1_mclkin_rx: i2s1-mclkin-rx {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <12288000>;
+		clock-output-names = "i2s1_mclkin_rx";
+	};
+
+	i2s1_mclkin_tx: i2s1-mclkin-tx {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <12288000>;
+		clock-output-names = "i2s1_mclkin_tx";
+	};
+
+	i2s2_mclkin: i2s2-mclkin {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <12288000>;
+		clock-output-names = "i2s2_mclkin";
+	};
+
+	i2s3_mclkin: i2s3-mclkin {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <12288000>;
+		clock-output-names = "i2s3_mclkin";
 	};
 
 	mpll: mpll {
@@ -895,6 +927,8 @@
 	pwm3: pwm@fdd70030 {
 		compatible = "rockchip,rk3568-pwm", "rockchip,rk3328-pwm";
 		reg = <0x0 0xfdd70030 0x0 0x10>;
+		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
 		#pwm-cells = <3>;
 		pinctrl-names = "active";
 		pinctrl-0 = <&pwm3_pins>;
@@ -1021,6 +1055,13 @@
 
 	npu_opp_table: npu-opp-table {
 		compatible = "operating-points-v2";
+
+		rockchip,temp-hysteresis = <5000>;
+		rockchip,low-temp = <0>;
+		rockchip,low-temp-adjust-volt = <
+			/* MHz    MHz    uV */
+			700       700    50000
+		>;
 
 		nvmem-cells = <&npu_leakage>;
 		nvmem-cell-names = "leakage";
@@ -1322,8 +1363,6 @@
 			<&cru CLK_RKVENC_CORE>;
 		clock-names = "aclk_vcodec", "hclk_vcodec", "clk_core";
 		rockchip,normal-rates = <297000000>, <0>, <400000000>;
-		rockchip,advanced-rates = <297000000>, <0>, <500000000>;
-		rockchip,default-max-load = <2088960>;
 		resets = <&cru SRST_A_RKVENC>, <&cru SRST_H_RKVENC>,
 			<&cru SRST_RKVENC_CORE>;
 		reset-names = "video_a", "video_h", "video_core";
@@ -1408,7 +1447,6 @@
 		interrupt-names = "csi-intr1", "csi-intr2";
 		clocks = <&cru PCLK_CSI2HOST1>, <&cru SRST_P_CSI2HOST1>;
 		clock-names = "pclk_csi2host", "srst_csihost_p";
-		power-domains = <&power RK3568_PD_VI>;
 		status = "disabled";
 	};
 
@@ -2011,6 +2049,13 @@
 	dmc_opp_table: dmc-opp-table {
 		compatible = "operating-points-v2";
 
+		rockchip,temp-hysteresis = <5000>;
+		rockchip,low-temp = <0>;
+		rockchip,low-temp-adjust-volt = <
+			/* MHz    MHz    uV */
+			0         1560   25000
+		>;
+
 		opp-324000000 {
 			opp-hz = /bits/ 64 <324000000>;
 			opp-microvolt = <900000>;
@@ -2428,6 +2473,7 @@
 		reset-names = "tx-m", "rx-m";
 		rockchip,cru = <&cru>;
 		rockchip,grf = <&grf>;
+		rockchip,clk-trcm = <1>;
 		#sound-dai-cells = <0>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&i2s3m0_sclk
@@ -2531,6 +2577,17 @@
 		clock-names = "apb_pclk";
 		#dma-cells = <1>;
 		arm,pl330-periph-burst;
+	};
+
+	scr: rkscr@fe560000 {
+		compatible = "rockchip-scr";
+		reg = <0x0 0xfe560000 0x0 0x10000>;
+		interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&scr_pins>;
+		clocks = <&cru PCLK_SCR>;
+		clock-names = "g_pclk_sim_card";
+		status = "disabled";
 	};
 
 	can0: can@fe570000 {
@@ -2880,6 +2937,8 @@
 	pwm7: pwm@fe6e0030 {
 		compatible = "rockchip,rk3568-pwm", "rockchip,rk3328-pwm";
 		reg = <0x0 0xfe6e0030 0x0 0x10>;
+		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
 		#pwm-cells = <3>;
 		pinctrl-names = "active";
 		pinctrl-0 = <&pwm7_pins>;
@@ -2924,6 +2983,8 @@
 	pwm11: pwm@fe6f0030 {
 		compatible = "rockchip,rk3568-pwm", "rockchip,rk3328-pwm";
 		reg = <0x0 0xfe6f0030 0x0 0x10>;
+		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
 		#pwm-cells = <3>;
 		pinctrl-names = "active";
 		pinctrl-0 = <&pwm11m0_pins>;
@@ -2968,6 +3029,8 @@
 	pwm15: pwm@fe700030 {
 		compatible = "rockchip,rk3568-pwm", "rockchip,rk3328-pwm";
 		reg = <0x0 0xfe700030 0x0 0x10>;
+		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
 		#pwm-cells = <3>;
 		pinctrl-names = "active";
 		pinctrl-0 = <&pwm15m0_pins>;
@@ -2990,11 +3053,11 @@
 		reset-names = "tsadc", "tsadc-apb", "tsadc-phy";
 		#thermal-sensor-cells = <1>;
 		rockchip,hw-tshut-temp = <120000>;
-		rockchip,hw-tshut-mode = <1>; /* tshut mode 0:CRU 1:GPIO */
+		rockchip,hw-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
 		rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
 		pinctrl-names = "gpio", "otpout";
 		pinctrl-0 = <&tsadc_gpio>;
-		pinctrl-1 = <&tsadcm0_shut>;
+		pinctrl-1 = <&tsadc_shutorg>;
 		status = "disabled";
 	};
 

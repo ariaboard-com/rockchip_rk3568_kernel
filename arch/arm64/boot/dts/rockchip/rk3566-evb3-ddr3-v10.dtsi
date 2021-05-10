@@ -160,7 +160,7 @@
 	snps,reset-delays-us = <0 20000 100000>;
 
 	assigned-clocks = <&cru SCLK_GMAC1_RX_TX>, <&cru SCLK_GMAC1>;
-	assigned-clock-parents = <&cru SCLK_GMAC1_RGMII_SPEED>;
+	assigned-clock-parents = <&cru SCLK_GMAC1_RGMII_SPEED>, <&cru CLK_MAC1_2TOP>;
 	assigned-clock-rates = <0>, <125000000>;
 
 	pinctrl-names = "default";
@@ -396,10 +396,11 @@
 
 &rk809_codec {
 	compatible = "rockchip,rk809-codec", "rockchip,rk817-codec";
-	clocks = <&cru I2S3_MCLKOUT_TX>;
+	clocks = <&cru I2S3_MCLKOUT>;
 	clock-names = "mclk";
-	assigned-clocks = <&cru I2S3_MCLKOUT_TX>;
-	assigned-clock-parents = <&cru CLK_I2S3_2CH_TX>;
+	assigned-clocks = <&cru I2S3_MCLKOUT>, <&cru I2S3_MCLK_IOE>;
+	assigned-clock-rates = <12288000>;
+	assigned-clock-parents = <&cru I2S3_MCLKOUT_TX>, <&cru I2S3_MCLKOUT>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2s3m1_mclk>;
 	hp-volume = <20>;
@@ -490,4 +491,8 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&wifi_host_wake_irq>;
 	WIFI,host_wake_irq = <&gpio2 RK_PB2 GPIO_ACTIVE_HIGH>;
+};
+
+&work_led {
+	gpios = <&gpio0 RK_PD3 GPIO_ACTIVE_HIGH>;
 };

@@ -703,6 +703,8 @@ void ion_device_add_heap(struct ion_heap *heap)
 
 	dev->heap_cnt++;
 	up_write(&dev->lock);
+
+	pr_info("%s: %s id=%d type=%d\n", __func__, heap->name, heap->id, heap->type);
 }
 EXPORT_SYMBOL(ion_device_add_heap);
 
@@ -756,6 +758,34 @@ static int ion_init_sysfs(void)
 	return 0;
 }
 
+#ifdef CONFIG_DEBUG_FS
+static int ion_heaps_show(struct seq_file *s, void *unused)
+{
+	struct ion_device *dev = internal_dev;
+	struct ion_heap *heap;
+
+	down_read(&dev->lock);
+	seq_printf(s, "%s\t%s\t%s\n", "id", "type", "name");
+	plist_for_each_entry(heap, &dev->heaps, node) {
+		seq_printf(s, "%u\t%u\t%s\n", heap->id, heap->type, heap->name);
+	}
+	up_read(&dev->lock);
+	return 0;
+}
+
+static int ion_heaps_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ion_heaps_show, NULL);
+}
+
+static const struct file_operations ion_heaps_operations = {
+	.open           = ion_heaps_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+#endif
+
 static int ion_device_create(void)
 {
 	struct ion_device *idev;
@@ -782,6 +812,10 @@ static int ion_device_create(void)
 	}
 
 	idev->debug_root = debugfs_create_dir("ion", NULL);
+#ifdef CONFIG_DEBUG_FS
+	debugfs_create_file("heaps", 0444, idev->debug_root, NULL,
+			    &ion_heaps_operations);
+#endif
 	idev->buffers = RB_ROOT;
 	mutex_init(&idev->buffer_lock);
 	init_rwsem(&idev->lock);
@@ -817,6 +851,12 @@ int ion_module_init(void)
 		return ret;
 
 	ret = ion_add_cma_heaps();
+#endif
+#ifdef CONFIG_ION_PROTECTED_HEAP
+	if (ret)
+		return ret;
+
+	ret = ion_protected_heap_create();
 #endif
 	return ret;
 }

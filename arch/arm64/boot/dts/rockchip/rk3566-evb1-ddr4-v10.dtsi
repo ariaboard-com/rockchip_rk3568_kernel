@@ -17,11 +17,11 @@
 	pcie20_3v3: gpio-regulator {
 		compatible = "regulator-gpio";
 		regulator-name = "pcie20_3v3";
-		regulator-min-microvolt = <0100000>;
+		regulator-min-microvolt = <100000>;
 		regulator-max-microvolt = <3300000>;
 		gpios = <&gpio0 RK_PB7 GPIO_ACTIVE_HIGH>;
 		gpios-states = <0x1>;
-		states = <0100000 0x0
+		states = <100000 0x0
 			  3300000 0x1>;
 	};
 
@@ -224,16 +224,6 @@
  */
 &gt1x {
 	power-supply = <&vcc3v3_lcd0_n>;
-};
-
-&hdmi {
-	rockchip,phy-table =
-		<92812500  0x8009 0x0000 0x0270>,
-		<165000000 0x800b 0x0000 0x026d>,
-		<185625000 0x800b 0x0000 0x01ed>,
-		<297000000 0x800b 0x0000 0x01ad>,
-		<594000000 0x8029 0x0000 0x0088>,
-		<000000000 0x0000 0x0000 0x0000>;
 };
 
 &i2c2 {
@@ -451,6 +441,10 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&wifi_host_wake_irq>;
 	WIFI,host_wake_irq = <&gpio3 RK_PD4 GPIO_ACTIVE_HIGH>;
+};
+
+&work_led {
+	gpios = <&gpio2 RK_PB2 GPIO_ACTIVE_HIGH>;
 };
 
 &pinctrl {

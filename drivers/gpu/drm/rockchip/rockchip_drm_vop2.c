@@ -469,6 +469,11 @@ struct vop2_video_port {
 	 * @cubic_lut: cubic look up table
 	 */
 	struct drm_color_lut *cubic_lut;
+
+	/**
+	 * @loader_protect: loader logo protect state
+	 */
+	bool loader_protect;
 };
 
 struct vop2 {
@@ -649,6 +654,20 @@ static uint64_t vop2_soc_id_fixup(uint64_t soc_id)
 	}
 }
 
+void vop2_standby(struct drm_crtc *crtc, bool standby)
+{
+	struct vop2_video_port *vp = to_vop2_video_port(crtc);
+	struct vop2 *vop2 = vp->vop2;
+
+	if (standby) {
+		VOP_MODULE_SET(vop2, vp, standby, 1);
+		mdelay(20);
+	} else {
+		VOP_MODULE_SET(vop2, vp, standby, 0);
+	}
+}
+EXPORT_SYMBOL(vop2_standby);
+
 static inline const struct vop2_win_regs *vop2_get_win_regs(struct vop2_win *win,
 							    const struct vop_reg *reg)
 {
@@ -798,20 +817,31 @@ static void vop2_wait_for_irq_handler(struct drm_crtc *crtc)
 	synchronize_irq(vop2->irq);
 }
 
-static void vop2_wait_for_fs_by_vcnt(struct vop2_video_port *vp, uint32_t base_vcnt)
+static bool vop2_fs_raw_status_pending(struct vop2_video_port *vp)
 {
 	struct vop2 *vop2 = vp->vop2;
-	uint32_t vcnt;
+	uint32_t offset = vp->id * 0x10;
+
+	return vop2_readl(vop2, RK3568_VP0_INT_RAW_STATUS + offset) & 0x20;
+
+}
+
+static void vop2_wait_for_fs_by_raw_status(struct vop2_video_port *vp)
+{
+	struct vop2 *vop2 = vp->vop2;
+	bool pending;
 	int ret;
 
 	/*
-	 * Spin until vcnt wraps around(from a big value to a little value)
+	 * Spin until frame start interrupt raw status bit goes high,
+	 * which means the configuration before the previous config done
+	 * has take effect.
 	 */
-	ret = readx_poll_timeout_atomic(vop2_read_vcnt, vp, vcnt,
-					vcnt < base_vcnt, 0, 20 * 1000);
+	ret = readx_poll_timeout_atomic(vop2_fs_raw_status_pending, vp, pending,
+					pending, 0, 10 * 1000);
 	if (ret)
-		DRM_DEV_ERROR(vop2->dev, "wait fs for vp%d timeout: %d--->%d\n",
-			      vp->id, base_vcnt, vcnt);
+		DRM_DEV_ERROR(vop2->dev, "wait vp%d raw fs statu timeout\n", vp->id);
+
 }
 
 static inline void vop2_cfg_done(struct drm_crtc *crtc)
@@ -850,9 +880,11 @@ static inline void vop2_cfg_done(struct drm_crtc *crtc)
 			done_vp = &vop2->vps[vp_id];
 			adjusted_mode = &done_vp->crtc.state->adjusted_mode;
 			vcnt = vop2_read_vcnt(done_vp);
+			if (adjusted_mode->flags & DRM_MODE_FLAG_INTERLACE)
+				vcnt >>= 1;
 			/* if close to the last 1/8 frame, wait to next frame */
 			if (vcnt > (adjusted_mode->crtc_vtotal * 7 >> 3)) {
-				vop2_wait_for_fs_by_vcnt(done_vp, vcnt);
+				vop2_wait_for_fs_by_raw_status(done_vp);
 				done_bits = 0;
 			}
 		}
@@ -1336,7 +1368,7 @@ static uint16_t vop2_scale_factor(enum scale_mode mode,
 			if (VOP2_BILI_SCL_FAC_CHECK(src, dst, fac))
 				break;
 			fac -= 1;
-			DRM_WARN("down fac cali: src:%d, dst:%d, fac:0x%x\n", src, dst, fac);
+			DRM_DEBUG("down fac cali: src:%d, dst:%d, fac:0x%x\n", src, dst, fac);
 		}
 	} else {
 		fac = VOP2_COMMON_SCL(src, dst);
@@ -1344,7 +1376,7 @@ static uint16_t vop2_scale_factor(enum scale_mode mode,
 			if (VOP2_COMMON_SCL_FAC_CHECK(src, dst, fac))
 				break;
 			fac -= 1;
-			DRM_WARN("up fac cali:  src:%d, dst:%d, fac:0x%x\n", src, dst, fac);
+			DRM_DEBUG("up fac cali:  src:%d, dst:%d, fac:0x%x\n", src, dst, fac);
 		}
 	}
 
@@ -1400,7 +1432,7 @@ static void vop2_setup_scale(struct vop2 *vop2, const struct vop2_win *win,
 	 */
 	if (!(win->feature & WIN_FEATURE_AFBDC)) {
 		if ((yrgb_hor_scl_mode == SCALE_DOWN) && (dst_w & 0x1)) {
-			DRM_WARN("%s dst_w[%d] should align as 2 pixel\n", win->name, dst_w);
+			dev_dbg(vop2->dev, "%s dst_w[%d] should align as 2 pixel\n", win->name, dst_w);
 			dst_w += 1;
 		}
 	}
@@ -1848,9 +1880,14 @@ static int vop2_wb_encoder_atomic_check(struct drm_encoder *encoder,
 
 	wb_state->vp_id = vp->id;
 	wb_state->yrgb_addr = rockchip_fb_get_dma_addr(fb, 0);
+	/*
+	 * uv address must follow yrgb address without gap.
+	 * the fb->offsets is include stride, so we should
+	 * not use it.
+	 */
 	if (fb->format->is_yuv) {
-		wb_state->uv_addr = rockchip_fb_get_dma_addr(fb, 1);
-		wb_state->uv_addr += fb->offsets[1];
+		wb_state->uv_addr = wb_state->yrgb_addr;
+		wb_state->uv_addr += DIV_ROUND_UP(fb->width * fb->format->bpp[0], 8) * fb->height;
 	}
 
 	return 0;
@@ -2184,26 +2221,40 @@ static void vop2_layer_map_initial(struct vop2 *vop2, uint32_t current_vp_id)
 	const struct vop2_data *vop2_data = vop2->data;
 	struct vop2_layer *layer = &vop2->layers[0];
 	struct vop2_video_port *vp = &vop2->vps[0];
-	struct vop2_video_port *current_vp = &vop2->vps[current_vp_id];
+	struct vop2_video_port *last_active_vp;
 	struct vop2_win *win;
 	const struct vop2_win_data *win_data = NULL;
 	uint32_t used_layers = 0;
 	uint32_t layer_map, sel;
 	uint32_t win_map, vp_id;
 	uint32_t port_mux;
+	uint32_t active_vp_mask = 0;
 	uint32_t standby;
 	uint32_t shift;
 	int i, j;
 
 	layer_map = vop2_readl(vop2, layer->regs->layer_sel.offset);
 	win_map = vop2_readl(vop2, vp->regs->port_mux.offset);
-	current_vp->win_mask = 0;
+
+	active_vp_mask |= BIT(current_vp_id);
+	/*
+	 * lookup if there are some vps activated
+	 * by bootloader(et: show boot logo)
+	 */
 	for (i = 0; i < vop2->data->nr_vps; i++) {
 		vp = &vop2->vps[i];
-		vp->win_mask = 0;
 		standby = vop2_readl(vop2, vp->regs->standby.offset);
 		shift = vp->regs->standby.shift;
 		standby = (standby >> shift) & 0x1;
+		if (!standby)
+			active_vp_mask |= BIT(i);
+	}
+
+	last_active_vp = &vop2->vps[fls(active_vp_mask) - 1];
+
+	for (i = 0; i < vop2->data->nr_vps; i++) {
+		vp = &vop2->vps[i];
+		vp->win_mask = 0;
 		for (j = 0; j < vop2_data->nr_layers; j++) {
 			win = vop2_find_win_by_phys_id(vop2, j);
 			shift = vop2->data->ctrl->win_vp_id[j].shift;
@@ -2211,16 +2262,18 @@ static void vop2_layer_map_initial(struct vop2 *vop2, uint32_t current_vp_id)
 			if (vp_id == i) {
 				/*
 				 * If the Video Port is not activated,
-				 * move the attached win to the Video Port
+				 * move the attached win to the last Video Port
 				 * we want enabled.
 				 */
-				if (standby) {
-					current_vp->win_mask |=  BIT(j);
-					win->vp_mask = BIT(current_vp_id);
-					VOP_CTRL_SET(vop2, win_vp_id[win->phys_id], current_vp_id);
-				} else {
+				if (active_vp_mask & BIT(vp_id)) {
 					vp->win_mask |=  BIT(j);
 					win->vp_mask = BIT(vp_id);
+
+				} else {
+					last_active_vp->win_mask |= BIT(j);
+					win->vp_mask = BIT(last_active_vp->id);
+					VOP_CTRL_SET(vop2, win_vp_id[win->phys_id], last_active_vp->id);
+
 				}
 			}
 		}
@@ -2484,6 +2537,15 @@ static int vop2_plane_atomic_check(struct drm_plane *plane, struct drm_plane_sta
 	vpstate->format = vop2_convert_format(fb->format->format);
 	if (vpstate->format < 0)
 		return vpstate->format;
+
+	if (state->src_w >> 16 < 4 || state->src_h >> 16 < 4 ||
+	    state->crtc_w < 4 || state->crtc_h < 4) {
+		DRM_ERROR("Invalid size: %dx%d->%dx%d, min size is 4x4\n",
+			  state->src_w >> 16, state->src_h >> 16,
+			  state->crtc_w, state->crtc_h);
+		return -EINVAL;
+	}
+
 	if (drm_rect_width(src) >> 16 > vop2_data->max_input.width ||
 	    drm_rect_height(src) >> 16 > vop2_data->max_input.height) {
 		DRM_ERROR("Invalid source: %dx%d. max input: %dx%d\n",
@@ -2532,7 +2594,8 @@ static int vop2_plane_atomic_check(struct drm_plane *plane, struct drm_plane_sta
 
 		offset = (src->x1 >> 16) * fb->format->bpp[1] / hsub / 8;
 		offset += (src->y1 >> 16) * fb->pitches[1] / vsub;
-
+		if (vpstate->ymirror_en && !vpstate->afbc_en)
+			offset += fb->pitches[1] * ((state->src_h >> 16) - 2)  / vsub;
 		dma_addr = rockchip_fb_get_dma_addr(fb, 1);
 		dma_addr += offset + fb->offsets[1];
 		vpstate->uv_mst = dma_addr;
@@ -2557,6 +2620,7 @@ static void vop2_plane_atomic_disable(struct drm_plane *plane, struct drm_plane_
 	spin_lock(&vop2->reg_lock);
 
 	vop2_win_disable(win);
+	VOP_WIN_SET(vop2, win, yuv_clip, 0);
 
 #if defined(CONFIG_ROCKCHIP_DRM_DEBUG)
 	kfree(vpstate->planlist);
@@ -2628,6 +2692,7 @@ static void vop2_plane_atomic_update(struct drm_plane *plane, struct drm_plane_s
 	struct vop2_video_port *vp = to_vop2_video_port(crtc);
 	struct vop2_plane_state *vpstate = to_vop2_plane_state(pstate);
 	struct drm_display_mode *adjusted_mode = &crtc->state->adjusted_mode;
+	struct rockchip_crtc_state *vcstate = to_rockchip_crtc_state(crtc->state);
 	struct vop2 *vop2 = win->vop2;
 	struct drm_framebuffer *fb = pstate->fb;
 	uint32_t bpp = fb->format->bpp[0];
@@ -2823,6 +2888,9 @@ static void vop2_plane_atomic_update(struct drm_plane *plane, struct drm_plane_s
 		VOP_CLUSTER_SET(vop2, win, lb_mode, lb_mode);
 		VOP_CLUSTER_SET(vop2, win, enable, 1);
 	}
+	if (vcstate->output_if & VOP_OUTPUT_IF_BT1120 ||
+	    vcstate->output_if & VOP_OUTPUT_IF_BT656)
+		VOP_WIN_SET(vop2, win, yuv_clip, 1);
 	spin_unlock(&vop2->reg_lock);
 
 	vop2->is_iommu_needed = true;
@@ -3195,7 +3263,7 @@ static int vop2_crtc_loader_protect(struct drm_crtc *crtc, bool on)
 	struct vop2_video_port *vp = to_vop2_video_port(crtc);
 	struct vop2 *vop2 = vp->vop2;
 
-	if (on == vop2->loader_protect)
+	if (on == vp->loader_protect)
 		return 0;
 
 	if (on) {
@@ -3203,10 +3271,10 @@ static int vop2_crtc_loader_protect(struct drm_crtc *crtc, bool on)
 		vop2_set_system_status(vop2);
 		vop2_initial(crtc);
 		drm_crtc_vblank_on(crtc);
-		vop2->loader_protect = true;
+		vp->loader_protect = true;
 	} else {
 		vop2_crtc_atomic_disable(crtc, NULL);
-		vop2->loader_protect = false;
+		vp->loader_protect = false;
 	}
 
 	return 0;
@@ -3312,19 +3380,22 @@ static void vop2_crtc_regs_dump(struct drm_crtc *crtc, struct seq_file *s)
 	struct vop2_video_port *vp = to_vop2_video_port(crtc);
 	struct vop2 *vop2 = vp->vop2;
 	struct drm_crtc_state *cstate = crtc->state;
-	uint32_t addr[] = {
-		RK3568_REG_CFG_DONE,
-		RK3568_OVL_CTRL,
-		RK3568_VP0_DSP_CTRL,
-		RK3568_VP1_DSP_CTRL,
-		RK3568_VP2_DSP_CTRL,
-		RK3568_CLUSTER0_WIN0_CTRL0,
-		RK3568_CLUSTER1_WIN0_CTRL0,
-		RK3568_ESMART0_CTRL0,
-		RK3568_ESMART1_CTRL0,
-		RK3568_SMART0_CTRL0,
-		RK3568_SMART1_CTRL0,
-		RK3568_HDR_LUT_CTRL,
+	const struct reg {
+		uint32_t offset;
+		const char *name;
+	} regs[] = {
+		{ RK3568_REG_CFG_DONE, "SYS" },
+		{ RK3568_OVL_CTRL, "OVL" },
+		{ RK3568_VP0_DSP_CTRL, "VP0" },
+		{ RK3568_VP1_DSP_CTRL, "VP1" },
+		{ RK3568_VP2_DSP_CTRL, "VP2" },
+		{ RK3568_CLUSTER0_WIN0_CTRL0, "Cluster0" },
+		{ RK3568_CLUSTER1_WIN0_CTRL0, "Cluster1" },
+		{ RK3568_ESMART0_CTRL0, "Esmart0" },
+		{ RK3568_ESMART1_CTRL0, "Esmart1" },
+		{ RK3568_SMART0_CTRL0, "Smart0" },
+		{ RK3568_SMART1_CTRL0, "Smart1" },
+		{ RK3568_HDR_LUT_CTRL, "HDR" },
 	};
 	uint32_t buf[68];
 	unsigned int len = ARRAY_SIZE(buf);
@@ -3334,14 +3405,14 @@ static void vop2_crtc_regs_dump(struct drm_crtc *crtc, struct seq_file *s)
 	if (!cstate->active)
 		return;
 
-	n = sizeof(addr) >> 2;
+	n = ARRAY_SIZE(regs);
 
 	for (i = 0; i < n; i++) {
-		base = addr[i];
-		pr_info("0x%08x:\n", base);
+		base = regs[i].offset;
+		pr_info("%s:\n", regs[i].name);
 		for (j = 0; j < len; j++)
 			buf[j] = vop2_readl(vop2, base + (4 * j));
-		print_hex_dump(KERN_ERR, "", DUMP_PREFIX_OFFSET, 16, 4, buf,
+		print_hex_dump(KERN_INFO, "", DUMP_PREFIX_OFFSET, 16, 4, buf,
 			       len << 2, 0);
 	}
 }
@@ -4068,7 +4139,7 @@ static void vop2_setup_hdr10(struct vop2_video_port *vp, uint8_t win_phys_id)
 	bool hdr2sdr_en = 0;
 	bool sdr2hdr_en = 0;
 	bool sdr2hdr_tf = 0;
-	bool hdr2sdr_tf_update = 0;
+	bool hdr2sdr_tf_update = 1;
 	bool sdr2hdr_tf_update = 0;
 
 	/*
@@ -4139,6 +4210,7 @@ static void vop2_setup_hdr10(struct vop2_video_port *vp, uint8_t win_phys_id)
 			vop2_load_sdr2hdr_table(vp, sdr2hdr_tf);
 		VOP_MODULE_SET(vop2, vp, sdr2hdr_r2r_mode, sdr2hdr_r2r_mode);
 	}
+	VOP_MODULE_SET(vop2, vp, sdr2hdr_path_en, sdr2hdr_en);
 	VOP_MODULE_SET(vop2, vp, sdr2hdr_oetf_en, sdr2hdr_en);
 	VOP_MODULE_SET(vop2, vp, sdr2hdr_eotf_en, sdr2hdr_en);
 	VOP_MODULE_SET(vop2, vp, sdr2hdr_r2r_en, sdr2hdr_en);
@@ -4194,9 +4266,7 @@ static void vop2_parse_alpha(struct vop2_alpha_config *alpha_config,
 	alpha->src_alpha_ctrl.bits.factor_mode = ALPHA_ONE;
 
 	alpha->dst_alpha_ctrl.bits.alpha_mode = ALPHA_STRAIGHT;
-	if (!alpha_config->dst_pixel_alpha_en)
-		alpha->dst_alpha_ctrl.bits.blend_mode = ALPHA_GLOBAL;
-	else if (alpha_config->dst_pixel_alpha_en && !dst_glb_alpha_en)
+	if (alpha_config->dst_pixel_alpha_en && !dst_glb_alpha_en)
 		alpha->dst_alpha_ctrl.bits.blend_mode = ALPHA_PER_PIX;
 	else
 		alpha->dst_alpha_ctrl.bits.blend_mode = ALPHA_PER_PIX_GLOBAL;
@@ -4204,26 +4274,18 @@ static void vop2_parse_alpha(struct vop2_alpha_config *alpha_config,
 	alpha->dst_alpha_ctrl.bits.factor_mode = ALPHA_SRC_INVERSE;
 }
 
-static int vop2_get_mixer_number(int nr_layers)
-{
-	if (nr_layers <= 1)
-		return nr_layers;
-	else
-		return nr_layers - 1;
-}
-
 static int vop2_find_start_mixer_id_for_vp(struct vop2 *vop2, uint8_t port_id)
 {
 	struct vop2_video_port *vp;
-	int mixer_id = 0;
+	int used_layer = 0;
 	int i;
 
 	for (i = 0; i < port_id; i++) {
 		vp = &vop2->vps[i];
-		mixer_id += vop2_get_mixer_number(hweight32(vp->win_mask));
+		used_layer += hweight32(vp->win_mask);
 	}
 
-	return mixer_id ? (mixer_id + 1) : 0;
+	return used_layer;
 }
 
 /*
@@ -4248,7 +4310,7 @@ static void vop2_setup_cluster_alpha(struct vop2 *vop2, struct vop2_cluster *clu
 	struct vop2_plane_state *sub_vpstate;
 	struct vop2_plane_state *top_win_vpstate;
 	struct vop2_plane_state *bottom_win_vpstate;
-	bool src_pixel_alpha_en = false, dst_pixel_alpha_en = false;
+	bool src_pixel_alpha_en = false;
 	u16 src_glb_alpha_val = 0xff, dst_glb_alpha_val = 0xff;
 	bool premulti_en = false;
 	bool swap = false;
@@ -4291,11 +4353,10 @@ static void vop2_setup_cluster_alpha(struct vop2 *vop2, struct vop2_cluster *clu
 	fb = bottom_win_vpstate->base.fb;
 	if (!fb)
 		return;
-	dst_pixel_alpha_en = is_alpha_support(fb->format->format);
 	alpha_config.src_premulti_en = premulti_en;
 	alpha_config.dst_premulti_en = false;
 	alpha_config.src_pixel_alpha_en = src_pixel_alpha_en;
-	alpha_config.dst_pixel_alpha_en = dst_pixel_alpha_en;
+	alpha_config.dst_pixel_alpha_en = true; /* alpha value need transfer to next mix */
 	alpha_config.src_glb_alpha_value = src_glb_alpha_val;
 	alpha_config.dst_glb_alpha_value = dst_glb_alpha_val;
 	vop2_parse_alpha(&alpha_config, &alpha);
@@ -4348,6 +4409,7 @@ static void vop2_setup_alpha(struct vop2_video_port *vp,
 	}
 
 	mixer_id = vop2_find_start_mixer_id_for_vp(vop2, vp->id);
+	alpha_config.dst_pixel_alpha_en = true; /* alpha value need transfer to next mix */
 	for (i = 1; i < vp->nr_layers; i++) {
 		zpos = &vop2_zpos[i];
 		win = vop2_find_win_by_phys_id(vop2, zpos->win_phys_id);
@@ -4361,7 +4423,6 @@ static void vop2_setup_alpha(struct vop2_video_port *vp,
 		pixel_alpha_en = is_alpha_support(fb->format->format);
 
 		alpha_config.src_premulti_en = premulti_en;
-		alpha_config.dst_pixel_alpha_en = false;
 		if (bottom_layer_alpha_en && i == 1) {/* Cd = Cs + (1 - As) * Cd * Agd */
 			alpha_config.dst_premulti_en = false;
 			alpha_config.src_pixel_alpha_en = pixel_alpha_en;
@@ -4392,7 +4453,6 @@ static void vop2_setup_alpha(struct vop2_video_port *vp,
 				alpha_config.src_premulti_en = premulti_en;
 				alpha_config.dst_premulti_en = true;
 				alpha_config.src_pixel_alpha_en = true;
-				alpha_config.dst_pixel_alpha_en = true;
 				alpha_config.src_glb_alpha_value = 0xff;
 				alpha_config.dst_glb_alpha_value = 0xff;
 				vop2_parse_alpha(&alpha_config, &alpha);
@@ -4414,13 +4474,16 @@ static void vop2_setup_alpha(struct vop2_video_port *vp,
 	/* Transfer pixel alpha value to next mix */
 	alpha_config.src_premulti_en = true;
 	alpha_config.dst_premulti_en = true;
-	alpha_config.src_pixel_alpha_en = true;
-	alpha_config.dst_pixel_alpha_en = true;
+	alpha_config.src_pixel_alpha_en = false;
 	alpha_config.src_glb_alpha_value = 0xff;
 	alpha_config.dst_glb_alpha_value = 0xff;
 	vop2_parse_alpha(&alpha_config, &alpha);
+
 	for (; i < hweight32(vp->win_mask); i++) {
 		offset = (mixer_id + i - 1) * 0x10;
+
+		vop2_writel(vop2, src_color_ctrl_offset + offset, alpha.src_alpha_ctrl.val);
+		vop2_writel(vop2, dst_color_ctrl_offset + offset, alpha.dst_color_ctrl.val);
 		vop2_writel(vop2, src_alpha_ctrl_offset + offset, alpha.src_alpha_ctrl.val);
 		vop2_writel(vop2, dst_alpha_ctrl_offset + offset, alpha.dst_alpha_ctrl.val);
 	}

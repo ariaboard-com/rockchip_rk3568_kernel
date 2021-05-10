@@ -26,11 +26,13 @@
 
 #define MPP_MAX_MSG_NUM			(16)
 #define MPP_MAX_REG_TRANS_NUM		(60)
+#define MPP_MAX_TASK_CAPACITY		(16)
 /* define flags for mpp_request */
 #define MPP_FLAGS_MULTI_MSG		(0x00000001)
 #define MPP_FLAGS_LAST_MSG		(0x00000002)
 #define MPP_FLAGS_REG_FD_NO_TRANS	(0x00000004)
 #define MPP_FLAGS_SCL_FD_NO_TRANS	(0x00000008)
+#define MPP_FLAGS_REG_NO_OFFSET		(0x00000010)
 #define MPP_FLAGS_SECURE_MODE		(0x00010000)
 
 /**
@@ -276,6 +278,16 @@ struct mpp_dev {
 	struct mpp_hw_ops *hw_ops;
 	struct mpp_dev_ops *dev_ops;
 
+	/* per-device work for attached taskqueue */
+	struct work_struct work;
+	/* task for work queue */
+	struct workqueue_struct *workq;
+	/*
+	 * The task capacity is the task queue length that hardware can accept.
+	 * Default 1 means normal hardware can only accept one task at once.
+	 */
+	u32 task_capacity;
+
 	int irq;
 	u32 irq_status;
 
@@ -284,9 +296,9 @@ struct mpp_dev {
 	struct mpp_iommu_info *iommu_info;
 
 	atomic_t reset_request;
+	atomic_t session_index;
 	atomic_t task_count;
-	/* task for work queue */
-	struct workqueue_struct *workq;
+	atomic_t task_index;
 	/* current task in running */
 	struct mpp_task *cur_task;
 	/* set session max buffers */
@@ -296,12 +308,15 @@ struct mpp_dev {
 	/* point to MPP Service */
 	struct platform_device *pdev_srv;
 	struct mpp_service *srv;
+
+	struct list_head queue_link;
 };
 
 struct mpp_task;
 
 struct mpp_session {
 	enum MPP_DEVICE_TYPE device_type;
+	u32 index;
 	/* the session related device private data */
 	struct mpp_service *srv;
 	struct mpp_dev *mpp;
@@ -326,6 +341,7 @@ struct mpp_session {
 	/* trans info set by user */
 	int trans_count;
 	u16 trans_table[MPP_MAX_REG_TRANS_NUM];
+	u32 msg_flags;
 	/* link to mpp_service session_list */
 	struct list_head session_link;
 	/* private data */
@@ -369,15 +385,11 @@ struct mpp_task {
 	struct timeval start;
 	/* hardware info for current task */
 	struct mpp_hw_info *hw_info;
+	u32 task_index;
 	u32 *reg;
 };
 
 struct mpp_taskqueue {
-	/* lock for trigger work */
-	struct mutex work_lock;
-	/* work for taskqueue */
-	struct work_struct work;
-
 	/* lock for pending list */
 	struct mutex pending_lock;
 	struct list_head pending_list;
@@ -390,6 +402,14 @@ struct mpp_taskqueue {
 	/* lock for mmu list */
 	struct mutex mmu_lock;
 	struct list_head mmu_list;
+	/* lock for dev list */
+	struct mutex dev_lock;
+	struct list_head dev_list;
+	/*
+	 * task_capacity in taskqueue is the minimum task capacity of the
+	 * device task capacity which is attached to the taskqueue
+	 */
+	u32 task_capacity;
 };
 
 struct mpp_reset_group {
@@ -484,8 +504,7 @@ struct mpp_dev_ops {
 	int (*dump_session)(struct mpp_session *session, struct seq_file *seq);
 };
 
-int mpp_taskqueue_init(struct mpp_taskqueue *queue,
-		       struct mpp_service *srv);
+struct mpp_taskqueue *mpp_taskqueue_init(struct device *dev);
 
 struct mpp_mem_region *
 mpp_task_attach_fd(struct mpp_task *task, int fd);

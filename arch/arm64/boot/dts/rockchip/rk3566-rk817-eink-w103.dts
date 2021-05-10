@@ -91,6 +91,7 @@
 	};
 
 	gpio_keys: gpio-keys {
+		status = "disabled";
 		compatible = "gpio-keys";
 		autorepeat;
 
@@ -135,20 +136,6 @@
 		irq-gpio = <&gpio0 RK_PC7 IRQ_TYPE_EDGE_BOTH>;
 		hall-active = <1>;
 		status = "okay";
-	};
-
-	reserved-memory {
-		#address-cells = <2>;
-		#size-cells = <2>;
-		ranges;
-
-		rknpu_reserved: rknpu {
-			compatible = "shared-dma-pool";
-			inactive;
-			reusable;
-			size = <0x0 0x20000000>;
-			alignment = <0x0 0x1000>;
-		};
 	};
 
 	vccsys: vccsys {
@@ -675,10 +662,11 @@
 		rk817_codec: codec {
 			#sound-dai-cells = <0>;
 			compatible = "rockchip,rk817-codec";
-			clocks = <&cru I2S1_MCLKOUT_TX>;
+			clocks = <&cru I2S1_MCLKOUT>;
 			clock-names = "mclk";
-			assigned-clocks = <&cru I2S1_MCLKOUT_TX>;
-			assigned-clock-parents = <&cru CLK_I2S1_8CH_TX>;
+			assigned-clocks = <&cru I2S1_MCLKOUT>, <&cru I2S1_MCLK_TX_IOE>;
+			assigned-clock-rates = <12288000>;
+			assigned-clock-parents = <&cru I2S1_MCLKOUT_TX>, <&cru I2S1_MCLKOUT_TX>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&i2s1m0_mclk>;
 			hp-volume = <20>;
@@ -879,6 +867,7 @@
 	tsc {
 		tsc_gpio: tsc-gpio {
 			rockchip,pins =
+					<0 RK_PB5 RK_FUNC_GPIO &pcfg_pull_down>, //touch q gpio
 					<0 RK_PA5 RK_FUNC_GPIO &pcfg_pull_up>,
 					<0 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
@@ -908,12 +897,12 @@
 
 		soc_slppin_slp: soc_slppin_slp {
 			rockchip,pins =
-				<0 RK_PA2 RK_FUNC_1 &pcfg_pull_none>;
+				<0 RK_PA2 1 &pcfg_pull_none>;
 		};
 
 		soc_slppin_rst: soc_slppin_rst {
 			rockchip,pins =
-				<0 RK_PA2 RK_FUNC_2 &pcfg_pull_none>;
+				<0 RK_PA2 2 &pcfg_pull_none>;
 		};
 	};
 
@@ -1014,16 +1003,6 @@
 
 &rkvenc_mmu {
 	status = "okay";
-};
-
-&rknpu {
-	memory-region = <&rknpu_reserved>;
-	rknpu-supply = <&vdd_gpu>;
-	status = "okay";
-};
-
-&rknpu_mmu {
-	status = "disabled";
 };
 
 &rockchip_suspend {

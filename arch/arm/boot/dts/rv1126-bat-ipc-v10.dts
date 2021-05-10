@@ -96,6 +96,7 @@
 	vcc1v2_dvdd: vcc1v8_dovdd: vcc2v8_avdd: vcc-camera {
 		compatible = "regulator-fixed";
 		regulator-name = "vcc_camera";
+		regulator-boot-on;
 		gpio = <&gpio0 RK_PA7 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 	};
@@ -308,7 +309,7 @@
 	};
 	es8311 {
 		spk_ctl: spk-ctl {
-			rockchip,pins = <2 RK_PA5 0 &pcfg_pull_none>;
+			rockchip,pins = <2 RK_PA5 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 	ir-cut {
@@ -369,7 +370,7 @@
 };
 
 &rkisp_thunderboot {
-	reg = <0x08000000 (128 * 0x00100000)>;
+	reg = <0x08000000 (32 * 0x00100000)>;
 };
 
 &rkisp_vir0 {
@@ -385,6 +386,14 @@
 			};
 		};
 	};
+};
+
+&rkisp_vir1 {
+	status = "okay";
+};
+
+&rkispp_vir1 {
+	status = "okay";
 };
 
 &rkvenc {
