@@ -71,22 +71,13 @@
 			pinctrl-0 = <&led_power>;
 		};
 
-		user_led0: diy0 {
-			label = "firefly:green:diy0";
-			linux,default-trigger = "ir-diy0-click";
-			default-state = "off";
-			gpios = <&gpio1 RK_PB0 GPIO_ACTIVE_HIGH>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&led_diy0>;
-		};
-
-		user_led1: diy1 {
-			label = "firefly:blue:diy1";
+		user_led: diy {
+			label = "firefly:blue:diy";
 			linux,default-trigger = "ir-diy1-click";
 			default-state = "off";
 			gpios = <&gpio1 RK_PB2 GPIO_ACTIVE_HIGH>;
 			pinctrl-names = "default";
-			pinctrl-0 = <&led_diy1>;
+			pinctrl-0 = <&led_diy>;
 		};
 
 
@@ -334,11 +325,7 @@
 			rockchip,pins = <1 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
 	    };
 
-	    led_diy0: led-diy0 {
-			rockchip,pins = <1 RK_PB0 RK_FUNC_GPIO &pcfg_pull_none>;
-	    };
-
-	    led_diy1: led-diy1 {
+	    led_diy: led-diy {
 			rockchip,pins = <1 RK_PB2 RK_FUNC_GPIO &pcfg_pull_none>;
 	    };
 	};
