@@ -25,16 +25,6 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&vcc_hub_reset_en>;
 		regulator-name = "vcc_hub_reset_en";
-		regulator-always-off;
-	};
-
-	vcc5v0_otg: vcc5v0-otg-regulator {
-		compatible = "regulator-fixed";
-		enable-active-high;
-		gpio = <&gpio0 RK_PA5 GPIO_ACTIVE_HIGH>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&vcc5v0_otg_en>;
-		regulator-name = "vcc5v0_otg";
 		regulator-always-on;
 	};
 
@@ -119,6 +109,21 @@
 	};
 };
 
+&i2c0 {
+    status = "okay";
+
+	fusb0: fusb30x@22 {
+		compatible = "fairchild,fusb302";
+		reg = <0x22>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&fusb0_int>;
+		int-n-gpios = <&gpio0 RK_PC1 GPIO_ACTIVE_HIGH>;
+		fusb340-switch-gpios = <&gpio3 RK_PC2 GPIO_ACTIVE_HIGH>;
+		vbus-5v-gpios = <&gpio0 RK_PA5 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+	};
+};
+
 &i2c1 {
     status = "okay";
 };
@@ -135,7 +140,7 @@
 		 pinctrl-names = "rockchip,camera_default";
 		 pinctrl-0 = <&cif_clk>;
 
-		 power-gpios = <&gpio0 RK_PC1 GPIO_ACTIVE_HIGH>;
+		 //power-gpios = <&gpio0 RK_PC1 GPIO_ACTIVE_HIGH>;
 		 reset-gpios = <&gpio0 RK_PD5 GPIO_ACTIVE_HIGH>;
 		 pwdn-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_HIGH>;
 
@@ -270,10 +275,6 @@
     status = "disabled";
 };
 
-&rk809_codec {
-    hp-ctl-gpios = <&gpio1 RK_PB0 GPIO_ACTIVE_HIGH>;
-};
-
 &rk809 {
     rtc {
         status = "disabled";
@@ -292,6 +293,32 @@
 	status = "disabled";
 };
 
+&vcc5v0_otg {
+	status = "disabled";
+};
+
+&combphy0_us {
+	status = "okay";
+	extcon = <&fusb0>;
+};
+
+&usbdrd_dwc3 {
+	dr_mode = "otg";
+	extcon = <&fusb0>;
+	status = "okay";
+};
+
+&usb2phy0 {
+	status = "okay";
+	extcon = <&fusb0>;
+};
+
+&u2phy0_otg {
+	/delete-property/ vbus-supply;
+	status = "okay";
+};
+
+
 &pinctrl {
 
 	usb {
@@ -302,9 +329,11 @@
 		vcc_hub_reset_en: vcc-hub-reset-en {
 			rockchip,pins = <1 RK_PA4 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
+	};
 
-		vcc5v0_otg_en: vcc5v0-otg-en {
-			rockchip,pins = <0 RK_PA5 RK_FUNC_GPIO &pcfg_pull_none>;
+	fusb30x {
+		fusb0_int: fusb0-int {
+			rockchip,pins = <0 RK_PC1 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
 	};
 

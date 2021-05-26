@@ -1718,6 +1718,13 @@ static void fusb_state_attached_source(struct fusb30x_chip *chip, u32 evt)
 	regmap_update_bits(chip->regmap, FUSB_REG_MASK, MASK_M_COMP_CHNG, 0);
 	dev_info(chip->dev, "CC connected in %s as DFP\n",
 		 chip->cc_polarity ? "CC1" : "CC2");
+	if(chip->gpio_fswitch){
+		if(chip->cc_polarity == TYPEC_POLARITY_CC1) {
+			gpiod_set_value(chip->gpio_fswitch, 0);
+		}else {
+			gpiod_set_value(chip->gpio_fswitch, 1);
+		}
+	}
 }
 
 static void fusb_state_attached_sink(struct fusb30x_chip *chip, u32 evt)
@@ -1740,6 +1747,14 @@ static void fusb_state_attached_sink(struct fusb30x_chip *chip, u32 evt)
 		set_state(chip, policy_snk_startup);
 		dev_info(chip->dev, "CC connected in %s as UFP\n",
 			 chip->cc_polarity ? "CC1" : "CC2");
+
+		if(chip->gpio_fswitch){
+			if(chip->cc_polarity == TYPEC_POLARITY_CC1) {
+				gpiod_set_value(chip->gpio_fswitch, 0);
+			}else {
+				gpiod_set_value(chip->gpio_fswitch, 1);
+			}
+		}
 		return;
 	} else if (evt & EVENT_TIMER_MUX) {
 		set_state_unattached(chip);
@@ -3213,6 +3228,12 @@ static int fusb_initialize_gpio(struct fusb30x_chip *chip)
 	chip->gpio_int = devm_gpiod_get_optional(chip->dev, "int-n", GPIOD_IN);
 	if (IS_ERR(chip->gpio_int))
 		return PTR_ERR(chip->gpio_int);
+	chip->gpio_fswitch = devm_gpiod_get_optional(chip->dev, "fusb340-switch", GPIOD_OUT_LOW);
+	if (IS_ERR(chip->gpio_fswitch)) {
+		dev_warn(chip->dev, "Could not get named GPIO for fusb340-switch!\n");
+	} else {
+		gpiod_set_value(chip->gpio_fswitch, 0);
+	}
 
 	/* some board support vbus with other ways */
 	chip->gpio_vbus_5v = devm_gpiod_get_optional(chip->dev, "vbus-5v",
@@ -3556,20 +3577,20 @@ static const struct dev_pm_ops fusb30x_pm_ops = {
 };
 
 static const struct of_device_id fusb30x_dt_match[] = {
-	{ .compatible = FUSB30X_I2C_DEVICETREE_NAME },
+	{ .compatible = "fairchild,fusb302" },
 	{},
 };
 MODULE_DEVICE_TABLE(of, fusb30x_dt_match);
 
 static const struct i2c_device_id fusb30x_i2c_device_id[] = {
-	{ FUSB30X_I2C_DRIVER_NAME, 0 },
+	{ "fusb302", 0 },
 	{}
 };
 MODULE_DEVICE_TABLE(i2c, fusb30x_i2c_device_id);
 
 static struct i2c_driver fusb30x_driver = {
 	.driver = {
-		.name = FUSB30X_I2C_DRIVER_NAME,
+		.name = "fusb302",
 		.of_match_table = of_match_ptr(fusb30x_dt_match),
 		.pm = &fusb30x_pm_ops,
 	},
