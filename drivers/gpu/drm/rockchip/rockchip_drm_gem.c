@@ -258,7 +258,7 @@ static int rockchip_gem_alloc_dma(struct rockchip_gem_object *rk_obj,
 		rk_obj->dma_attrs |= DMA_ATTR_NO_KERNEL_MAPPING;
 
 	rk_obj->kvaddr = dma_alloc_attrs(drm->dev, obj->size,
-					 &rk_obj->dma_handle, GFP_KERNEL,
+					 &rk_obj->dma_addr, GFP_KERNEL,
 					 rk_obj->dma_attrs);
 	if (!rk_obj->kvaddr) {
 		DRM_ERROR("failed to allocate %zu byte dma buffer", obj->size);
@@ -272,7 +272,7 @@ static int rockchip_gem_alloc_dma(struct rockchip_gem_object *rk_obj,
 	}
 
 	ret = dma_get_sgtable_attrs(drm->dev, sgt, rk_obj->kvaddr,
-				    rk_obj->dma_handle, obj->size,
+				    rk_obj->dma_addr, obj->size,
 				    rk_obj->dma_attrs);
 	if (ret) {
 		DRM_ERROR("failed to allocate sgt, %d\n", ret);
@@ -352,7 +352,7 @@ static int rockchip_gem_alloc_secure(struct rockchip_gem_object *rk_obj)
 		return -ENOMEM;
 	}
 
-	rk_obj->dma_handle = paddr;
+	rk_obj->dma_addr = paddr;
 	rk_obj->num_pages = rk_obj->base.size >> PAGE_SHIFT;
 
 	rk_obj->pages = drm_calloc_large(rk_obj->num_pages,
@@ -396,7 +396,7 @@ static void rockchip_gem_free_secure(struct rockchip_gem_object *rk_obj)
 	drm_free_large(rk_obj->pages);
 	sg_free_table(rk_obj->sgt);
 	kfree(rk_obj->sgt);
-	gen_pool_free(private->secure_buffer_pool, rk_obj->dma_handle,
+	gen_pool_free(private->secure_buffer_pool, rk_obj->dma_addr,
 		      rk_obj->base.size);
 }
 
@@ -449,8 +449,7 @@ static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
 		if (ret < 0)
 			goto err_free;
 	} else {
-		WARN_ON(!rk_obj->dma_handle);
-		rk_obj->dma_addr = rk_obj->dma_handle;
+		WARN_ON(!rk_obj->dma_addr);
 	}
 
 	return 0;
@@ -477,7 +476,7 @@ static void rockchip_gem_free_dma(struct rockchip_gem_object *rk_obj)
 	sg_free_table(rk_obj->sgt);
 	kfree(rk_obj->sgt);
 	dma_free_attrs(drm->dev, obj->size, rk_obj->kvaddr,
-		       rk_obj->dma_handle, rk_obj->dma_attrs);
+		       rk_obj->dma_addr, rk_obj->dma_attrs);
 }
 
 static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
@@ -721,8 +720,9 @@ rockchip_gem_create_with_handle(struct drm_file *file_priv,
 	struct rockchip_gem_object *rk_obj;
 	struct drm_gem_object *obj;
 	int ret;
+	bool alloc_kmap = flags & ROCKCHIP_BO_ALLOC_KMAP ? true : false;
 
-	rk_obj = rockchip_gem_create_object(drm, size, false, flags);
+	rk_obj = rockchip_gem_create_object(drm, size, alloc_kmap, flags);
 	if (IS_ERR(rk_obj))
 		return ERR_CAST(rk_obj);
 
@@ -1025,5 +1025,97 @@ int rockchip_gem_prime_end_cpu_access(struct drm_gem_object *obj,
 
 	dma_sync_sg_for_device(drm->dev, rk_obj->sgt->sgl,
 			       rk_obj->sgt->nents, dir);
+	return 0;
+}
+
+static int rockchip_gem_prime_sgl_sync_range(struct device *dev,
+					struct scatterlist *sgl, unsigned int nents,
+					unsigned int offset, unsigned int length,
+					enum dma_data_direction dir, bool for_cpu)
+{
+	int i;
+	struct scatterlist *sg;
+	unsigned int len = 0;
+	dma_addr_t sg_dma_addr;
+
+	for_each_sg(sgl, sg, nents, i) {
+		if (sg_dma_len(sg) == 0)
+			break;
+
+		if (i > 0) {
+			pr_warn_ratelimited("Partial cmo only supported with 1 segment\n"
+				"is dma_set_max_seg_size being set on dev:%s\n",
+				dev_name(dev));
+			return -EINVAL;
+		}
+	}
+
+	for_each_sg(sgl, sg, nents, i) {
+		unsigned int sg_offset, sg_left, size = 0;
+
+		if (i == 0)
+			sg_dma_addr = sg_dma_address(sg);
+
+		len += sg->length;
+		if (len <= offset) {
+			sg_dma_addr += sg->length;
+			continue;
+		}
+
+		sg_left = len - offset;
+		sg_offset = sg->length - sg_left;
+
+		size = (length < sg_left) ? length : sg_left;
+		if (for_cpu)
+			dma_sync_single_range_for_cpu(dev, sg_dma_addr,
+						      sg_offset, size, dir);
+		else
+			dma_sync_single_range_for_device(dev, sg_dma_addr,
+							 sg_offset, size, dir);
+
+		offset += size;
+		length -= size;
+		sg_dma_addr += sg->length;
+
+		if (length == 0)
+			break;
+	}
+
+	return 0;
+}
+
+int rockchip_gem_prime_begin_cpu_access_partial(struct drm_gem_object *obj,
+						enum dma_data_direction dir,
+						unsigned int offset,
+						unsigned int len)
+{
+	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
+	struct drm_device *drm = obj->dev;
+
+	if (!rk_obj->sgt)
+		return 0;
+
+	rockchip_gem_prime_sgl_sync_range(drm->dev, rk_obj->sgt->sgl,
+					  rk_obj->sgt->nents,
+					  offset, len, dir, true);
+
+	return 0;
+}
+
+int rockchip_gem_prime_end_cpu_access_partial(struct drm_gem_object *obj,
+					      enum dma_data_direction dir,
+					      unsigned int offset,
+					      unsigned int len)
+{
+	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
+	struct drm_device *drm = obj->dev;
+
+	if (!rk_obj->sgt)
+		return 0;
+
+	rockchip_gem_prime_sgl_sync_range(drm->dev, rk_obj->sgt->sgl,
+					  rk_obj->sgt->nents,
+					  offset, len, dir, false);
+
 	return 0;
 }

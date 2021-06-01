@@ -651,6 +651,17 @@ config VIDEO_APTINA_PLL
 config VIDEO_SMIAPP_PLL
 	tristate
 
+config VIDEO_IMX178
+	tristate "Sony IMX178 sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	help
+	  This is a Video4Linux2 sensor driver for the Sony
+	  IMX178 camera.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called imx178.
+
 config VIDEO_IMX219
 	tristate "Sony IMX219 sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
@@ -790,6 +801,17 @@ config VIDEO_IMX415
 	  To compile this driver as a module, choose M here: the
 	  module will be called imx415.
 
+config VIDEO_IMX464
+	tristate "Sony IMX464 sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	help
+	  This is a Video4Linux2 sensor driver for the Sony
+	  IMX464 camera.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called imx464.
+
 config VIDEO_OS02G10
 	tristate "OmniVision OS02G10 sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
@@ -808,6 +830,15 @@ config VIDEO_OS04A10
 	  This is a Video4Linux2 sensor driver for the OmniVision
 	  OS04A10 camera.
 
+config VIDEO_OS04C10
+	tristate "OmniVision OS04C10 sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  This is a Video4Linux2 sensor driver for the OmniVision
+	  OS04C10 camera.
+
 config VIDEO_OS05A20
 	tristate "OmniVision OS05A20 sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
@@ -816,6 +847,15 @@ config VIDEO_OS05A20
 	help
 	  This is a Video4Linux2 sensor driver for the OmniVision
 	  OS05A20 camera.
+
+config VIDEO_OS08A10
+	tristate "OmniVision OS08A10 sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  This is a Video4Linux2 sensor driver for the OmniVision
+	  OS08A10 camera.
 
 config VIDEO_OV02B10
 	tristate "OmniVision OV02B10 sensor support"
@@ -1320,6 +1360,22 @@ config VIDEO_S5K6A3
 	  This is a V4L2 sensor driver for Samsung S5K6A3 raw
 	  camera sensor.
 
+config VIDEO_S5KGM1SP
+	tristate "Samsung S5KGM1SP sensor support"
+	depends on MEDIA_CAMERA_SUPPORT
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	help
+	  This is a V4L2 sensor driver for Samsung S5KGM1SP raw
+	  camera sensor.
+
+config VIDEO_S5K4H7YX
+	tristate "Samsung S5K4H7YX sensor support"
+	depends on MEDIA_CAMERA_SUPPORT
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	help
+	  This is a V4L2 sensor driver for Samsung S5K4H7YX raw
+	  camera sensor.
+
 config VIDEO_S5K4ECGX
 	tristate "Samsung S5K4ECGX sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
@@ -1600,6 +1656,17 @@ config VIDEO_JX_H65
 	  To compile this driver as a module, choose M here: the
 	  module will be called jx_h65.
 
+config VIDEO_JX_K04
+	tristate "SOI JX_K04 sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  Support for the SOI JX_K04 sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called jx_k04.
+
 config VIDEO_SC031GS
 	tristate "SmartSens SC031GS sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
@@ -1610,6 +1677,17 @@ config VIDEO_SC031GS
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called sc031gs.
+
+config VIDEO_SC035HGS
+	tristate "SmartSens SC035HGS sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  Support for the SmartSens SC035HGS sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called sc035hgs.
 
 config VIDEO_SC132GS
 	tristate "SmartSens SC132GS sensor support"
@@ -1677,6 +1755,17 @@ config VIDEO_SC2310
 	  To compile this driver as a module, choose M here: the
 	  module will be called sc2310.
 
+config VIDEO_SC2335
+	tristate "SmartSens SC2335 sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  Support for the SmartSens SC2335 sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called sc2335.
+
 config VIDEO_SC401AI
 	tristate "SmartSens SC401AI sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
@@ -1720,6 +1809,52 @@ config VIDEO_SC500AI
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called SC500AI.
+
+config VIDEO_SC8220
+	tristate "SmartSens SC8220 sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  Support for the SmartSens SC8220 sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called SC8220.
+
+config VIDEO_SP250A
+	tristate "Superpix SP250A sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  Support for the SmartSens SP250A sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called SP250A.
+
+config VIDEO_HYNIX_HI556
+	tristate "Hynix HI556 sensor support"
+	depends on VIDEO_V4L2 && I2C && MEDIA_CONTROLLER
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  This is a Video4Linux2 sensor driver for the Hynix
+	  HI556 camera.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called hynix_hi556.
+
+config VIDEO_HYNIX_HI846
+	tristate "Hynix HI846 sensor support"
+	depends on VIDEO_V4L2 && I2C && MEDIA_CONTROLLER
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  This is a Video4Linux2 sensor driver for the Hynix
+	  HI846 camera.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called hynix_hi846.
 
 comment "Flash devices"
 

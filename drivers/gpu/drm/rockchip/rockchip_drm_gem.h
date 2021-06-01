@@ -31,7 +31,6 @@ struct rockchip_gem_object {
 	void *kvaddr;
 	void *cookie;
 	dma_addr_t dma_addr;
-	dma_addr_t dma_handle;
 
 	/* Used when IOMMU is disabled */
 	unsigned long dma_attrs;
@@ -91,4 +90,15 @@ int rockchip_gem_prime_begin_cpu_access(struct drm_gem_object *obj,
 
 int rockchip_gem_prime_end_cpu_access(struct drm_gem_object *obj,
 				      enum dma_data_direction dir);
+
+int rockchip_gem_prime_begin_cpu_access_partial(struct drm_gem_object *obj,
+						enum dma_data_direction dir,
+						unsigned int offset,
+						unsigned int len);
+
+int rockchip_gem_prime_end_cpu_access_partial(struct drm_gem_object *obj,
+					      enum dma_data_direction dir,
+					      unsigned int offset,
+					      unsigned int len);
+
 #endif /* _ROCKCHIP_DRM_GEM_H */

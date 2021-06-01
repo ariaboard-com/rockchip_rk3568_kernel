@@ -5,6 +5,8 @@
  * Copyright (C) 2020 Rockchip Electronics Co., Ltd.
  *
  * V0.0X01.0X00 first version.
+ * V0.0X01.0X01 update init setting.
+ * V0.0X01.0X02 fix set flip/mirror failed bug and fix wrong vts_def value.
  */
 
 #include <linux/clk.h>
@@ -27,29 +29,36 @@
 #include <linux/rk-preisp.h>
 #include "../platform/rockchip/isp/rkisp_tb_helper.h"
 
-#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x00)
+#define DRIVER_VERSION			KERNEL_VERSION(0, 0x01, 0x02)
 
 #ifndef V4L2_CID_DIGITAL_GAIN
 #define V4L2_CID_DIGITAL_GAIN		V4L2_CID_GAIN
 #endif
 
-#define MIPI_FREQ_360M			360000000
-#define PIXEL_RATE_WITH_360M		(MIPI_FREQ_360M * 2 * 2 / 10)
-
-#define OS02G10_XVCLK_FREQ		24000000
-
 #define OS02G10_CHIP_ID			0x5602
 #define OS02G10_REG_CHIP_ID_H		0x02
 #define OS02G10_REG_CHIP_ID_L		0x03
 
-#define OS02G10_REG_PAGE_SELECT		0xFD
+#define OS02G10_XVCLK_FREQ		24000000
+#define BITS_PER_SAMPLE			10
+#define MIPI_FREQ_360M			360000000
+#define OS02G10_LANES			2
+#define PIXEL_RATE_WITH_360M	(MIPI_FREQ_360M * OS02G10_LANES * 2 / BITS_PER_SAMPLE)
+
+#define OS02G10_REG_PAGE_SELECT		0xfd
 
 #define OS02G10_REG_EXP_H		0x03
 #define OS02G10_REG_EXP_L		0x04
+#define OS02G10_EXPOSURE_MIN		4
+#define OS02G10_EXPOSURE_STEP		1
 
 #define OS02G10_REG_AGAIN		0x24
 #define OS02G10_REG_DGAIN_H		0x37
 #define OS02G10_REG_DGAIN_L		0x39
+#define OS02G10_GAIN_MIN		0x10
+#define OS02G10_GAIN_MAX		0x2000
+#define OS02G10_GAIN_STEP		1
+#define OS02G10_GAIN_DEFAULT	0x10
 
 #define OS02G10_REG_HTS_H		0x41
 #define OS02G10_REG_HTS_L		0x42
@@ -59,29 +68,21 @@
 #define OS02G10_REG_VBLANK_H		0x05
 #define OS02G10_REG_VBLANK_L		0x06
 
-#define OS02G10_VTS_MAX			0xFFFF
+#define OS02G10_VTS_MAX			0xffff
 #define OS02G10_REG_RESTART		0x01
 
 #define OS02G10_REG_CTRL_MODE		0xb1
 #define OS02G10_MODE_SW_STANDBY		0x0
 #define OS02G10_MODE_STREAMING		0x03
 
-#define OS02G10_REG_SOFTWARE_RESET	0xFC
+#define OS02G10_REG_SOFTWARE_RESET	0xfc
 #define OS02G10_SOFTWARE_RESET_VAL	0x1
-
-#define OS02G10_GAIN_MIN		0x10
-#define OS02G10_GAIN_MAX		0x2000
-#define OS02G10_GAIN_STEP		1
-#define OS02G10_GAIN_DEFAULT		0x10
-
-#define OS02G10_EXPOSURE_MIN		4
-#define OS02G10_EXPOSURE_STEP		1
 
 #define OS02G10_FLIP_REG		0x3f
 #define MIRROR_BIT_MASK			BIT(0)
 #define FLIP_BIT_MASK			BIT(1)
+#define OS02G10_REG_BAYER_ORDER		0x5e
 
-#define OS02G10_LANES			2
 #define OS02G10_NAME			"os02g10"
 
 #define OF_CAMERA_HDR_MODE		"rockchip,camera-hdr-mode"
@@ -132,11 +133,9 @@ struct os02g10 {
 	struct gpio_desc	*reset_gpio;
 	struct gpio_desc	*pwdn_gpio;
 	struct regulator_bulk_data supplies[OS02G10_NUM_SUPPLIES];
-
 	struct pinctrl		*pinctrl;
 	struct pinctrl_state	*pins_default;
 	struct pinctrl_state	*pins_sleep;
-
 	struct v4l2_subdev	subdev;
 	struct media_pad	pad;
 	struct v4l2_ctrl_handler ctrl_handler;
@@ -147,8 +146,6 @@ struct os02g10 {
 	struct v4l2_ctrl	*vblank;
 	struct v4l2_ctrl	*pixel_rate;
 	struct v4l2_ctrl	*link_freq;
-	struct v4l2_ctrl	*h_flip;
-	struct v4l2_ctrl	*v_flip;
 	struct mutex		mutex;
 	bool			streaming;
 	bool			power_on;
@@ -165,9 +162,6 @@ struct os02g10 {
 
 #define to_os02g10(sd) container_of(sd, struct os02g10, subdev)
 
-/*
- * Xclk 24Mhz
- */
 static const struct regval os02g10_linear10bit_1920x1080_regs[] = {
 	{0xfd, 0x00},
 	{0xfd, 0x00},
@@ -179,10 +173,10 @@ static const struct regval os02g10_linear10bit_1920x1080_regs[] = {
 	{0xfd, 0x01},
 	{0x03, 0x04},
 	{0x04, 0x4c},
-	{0x06, 0xdd},
-	{0x24, 0x10},
+	{0x06, 0x00},
+	{0x24, 0x30},
 	{0x01, 0x01},
-	{0x19, 0x58},
+	{0x19, 0x50},
 	{0x1a, 0x0c},
 	{0x1b, 0x0d},
 	{0x1c, 0x00},
@@ -191,11 +185,11 @@ static const struct regval os02g10_linear10bit_1920x1080_regs[] = {
 	{0x22, 0x14},
 	{0x25, 0x44},
 	{0x26, 0x0f},
-	{0x3c, 0xc1},
-	{0x3d, 0x44},
+	{0x3c, 0xca},
+	{0x3d, 0x4a},
 	{0x40, 0x0f},
 	{0x43, 0x38},
-	{0x46, 0x01},
+	{0x46, 0x00},
 	{0x47, 0x00},
 	{0x49, 0x32},
 	{0x50, 0x01},
@@ -205,20 +199,20 @@ static const struct regval os02g10_linear10bit_1920x1080_regs[] = {
 	{0x57, 0x16},
 	{0x59, 0x01},
 	{0x5a, 0x01},
-	{0x5d, 0x54},
+	{0x5d, 0x04},
 	{0x6a, 0x04},
 	{0x6b, 0x03},
 	{0x6e, 0x28},
-	{0x71, 0xc2},
-	{0x72, 0x04},
+	{0x71, 0xbe},
+	{0x72, 0x06},
 	{0x73, 0x38},
-	{0x74, 0x04},
+	{0x74, 0x06},
 	{0x79, 0x00},
 	{0x7a, 0xb2},
 	{0x7b, 0x10},
 	{0x8f, 0x80},
 	{0x91, 0x38},
-	{0x92, 0x02},
+	{0x92, 0x0a},
 	{0x9d, 0x03},
 	{0x9e, 0x55},
 	{0xb8, 0x70},
@@ -226,10 +220,14 @@ static const struct regval os02g10_linear10bit_1920x1080_regs[] = {
 	{0xba, 0x70},
 	{0xbb, 0x70},
 	{0xbc, 0x00},
-	{0xc4, 0x70},
-	{0xc5, 0x70},
-	{0xc6, 0x70},
-	{0xc7, 0x70},
+	{0xc0, 0x00},
+	{0xc1, 0x00},
+	{0xc2, 0x00},
+	{0xc3, 0x00},
+	{0xc4, 0x6e},
+	{0xc5, 0x6e},
+	{0xc6, 0x6b},
+	{0xc7, 0x6b},
 	{0xcc, 0x11},
 	{0xcd, 0xe0},
 	{0xd0, 0x1b},
@@ -243,14 +241,18 @@ static const struct regval os02g10_linear10bit_1920x1080_regs[] = {
 	{0xf1, 0x40},
 	{0xf2, 0x40},
 	{0xf3, 0x40},
+	{0xf4, 0x00},
 	{0xfa, 0x1c},
 	{0xfb, 0x33},
+	{0xfc, 0xff},
+	{0xfe, 0x01},
 	{0xfd, 0x03},
 	{0x03, 0x67},
-	{0x00, 0x5b},
+	{0x00, 0x59},
 	{0x04, 0x11},
 	{0x05, 0x04},
 	{0x06, 0x0c},
+	{0x07, 0x08},
 	{0x08, 0x08},
 	{0x09, 0x4f},
 	{0x0b, 0x08},
@@ -259,15 +261,19 @@ static const struct regval os02g10_linear10bit_1920x1080_regs[] = {
 	{0xfd, 0x02},
 	{0x34, 0xfe},
 	{0x5e, 0x22},
-	{0xa1, 0x04},
+	{0xa1, 0x06},
 	{0xa3, 0x38},
-	{0xa5, 0x04},
+	{0xa5, 0x02},
 	{0xa7, 0x80},
 	{0xfd, 0x01},
 	{0xa1, 0x05},
+	{0x94, 0x44},
+	{0x95, 0x44},
+	{0x96, 0x09},
+	{0x98, 0x44},
+	{0x9c, 0x0e},
 	{0xb1, 0x01},
 	{0xfd, 0x01},
-	{0xb1, 0x03},
 	{REG_NULL, 0x00},
 };
 
@@ -294,7 +300,7 @@ static const struct os02g10_mode supported_modes[] = {
 		},
 		.exp_def = 0x044c,
 		.hts_def = 0x043a * 2,
-		.vts_def = 0x0844,
+		.vts_def = 0x0516,
 		.reg_list = os02g10_linear10bit_1920x1080_regs,
 		.hdr_mode = NO_HDR,
 		.vc[PAD0] = V4L2_MBUS_CSI2_CHANNEL_0,
@@ -304,11 +310,6 @@ static const struct os02g10_mode supported_modes[] = {
 static const s64 link_freq_menu_items[] = {
 	MIPI_FREQ_360M,
 };
-
-static int __os02g10_power_on(struct os02g10 *os02g10);
-
-static int os02g10_check_sensor_id(struct os02g10 *os02g10,
-                                   struct i2c_client *client);
 
 /* sensor register write */
 static int os02g10_write_reg(struct i2c_client *client, u8 reg, u8 val)
@@ -326,11 +327,11 @@ static int os02g10_write_reg(struct i2c_client *client, u8 reg, u8 val)
 	msg.len = sizeof(buf);
 
 	ret = i2c_transfer(client->adapter, &msg, 1);
+
 	if (ret >= 0)
 		return 0;
 
-	dev_err(&client->dev,
-	        "os02g10 write reg(0x%x val:0x%x) failed !\n", reg, val);
+	dev_err(&client->dev, "write reg(0x%x val:0x%x) failed !\n", reg, val);
 
 	return ret;
 }
@@ -550,11 +551,6 @@ static int os02g10_g_mbus_config(struct v4l2_subdev *sd,
 		val = 1 << (OS02G10_LANES - 1) |
 		      V4L2_MBUS_CSI2_CHANNEL_0 |
 		      V4L2_MBUS_CSI2_CONTINUOUS_CLOCK;
-	if (mode->hdr_mode == HDR_X2)
-		val = 1 << (OS02G10_LANES - 1) |
-		      V4L2_MBUS_CSI2_CHANNEL_0 |
-		      V4L2_MBUS_CSI2_CONTINUOUS_CLOCK |
-		      V4L2_MBUS_CSI2_CHANNEL_1;
 
 	config->type = V4L2_MBUS_CSI2;
 	config->flags = val;
@@ -566,10 +562,10 @@ static void os02g10_get_module_inf(struct os02g10 *os02g10,
                                    struct rkmodule_inf *inf)
 {
 	memset(inf, 0, sizeof(*inf));
-	strlcpy(inf->base.sensor, OS02G10_NAME, sizeof(inf->base.sensor));
-	strlcpy(inf->base.module, os02g10->module_name,
+	strscpy(inf->base.sensor, OS02G10_NAME, sizeof(inf->base.sensor));
+	strscpy(inf->base.module, os02g10->module_name,
 	        sizeof(inf->base.module));
-	strlcpy(inf->base.lens, os02g10->len_name, sizeof(inf->base.lens));
+	strscpy(inf->base.lens, os02g10->len_name, sizeof(inf->base.lens));
 }
 
 static long os02g10_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
@@ -580,23 +576,18 @@ static long os02g10_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	u32 stream = 0;
 
 	switch (cmd) {
-	case PREISP_CMD_SET_HDRAE_EXP:
-		ret = -1;
+	case RKMODULE_GET_MODULE_INFO:
+		os02g10_get_module_inf(os02g10, (struct rkmodule_inf *)arg);
 		break;
 	case RKMODULE_SET_HDR_CFG:
 		hdr_cfg = (struct rkmodule_hdr_cfg *)arg;
 		if (hdr_cfg->hdr_mode != 0)
 			ret = -1;
 		break;
-	case RKMODULE_GET_MODULE_INFO:
-		os02g10_get_module_inf(os02g10, (struct rkmodule_inf *)arg);
-		break;
 	case RKMODULE_GET_HDR_CFG:
 		hdr_cfg = (struct rkmodule_hdr_cfg *)arg;
 		hdr_cfg->esp.mode = HDR_NORMAL_VC;
 		hdr_cfg->hdr_mode = os02g10->cur_mode->hdr_mode;
-		break;
-	case RKMODULE_SET_CONVERSION_GAIN:
 		break;
 	case RKMODULE_SET_QUICK_STREAM:
 		stream = *((u32 *)arg);
@@ -621,11 +612,8 @@ static long os02g10_compat_ioctl32(struct v4l2_subdev *sd,
 {
 	void __user *up = compat_ptr(arg);
 	struct rkmodule_inf *inf;
-	struct rkmodule_awb_cfg *cfg;
 	struct rkmodule_hdr_cfg *hdr;
-	struct preisp_hdrae_exp_s *hdrae;
 	long ret;
-	u32 cg = 0;
 	u32 stream = 0;
 
 	switch (cmd) {
@@ -637,21 +625,12 @@ static long os02g10_compat_ioctl32(struct v4l2_subdev *sd,
 		}
 
 		ret = os02g10_ioctl(sd, cmd, inf);
-		if (!ret)
+		if (!ret) {
 			ret = copy_to_user(up, inf, sizeof(*inf));
-		kfree(inf);
-		break;
-	case RKMODULE_AWB_CFG:
-		cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
-		if (!cfg) {
-			ret = -ENOMEM;
-			return ret;
+			if (ret)
+				ret = -EFAULT;
 		}
-
-		ret = copy_from_user(cfg, up, sizeof(*cfg));
-		if (!ret)
-			ret = os02g10_ioctl(sd, cmd, cfg);
-		kfree(cfg);
+		kfree(inf);
 		break;
 	case RKMODULE_GET_HDR_CFG:
 		hdr = kzalloc(sizeof(*hdr), GFP_KERNEL);
@@ -661,8 +640,11 @@ static long os02g10_compat_ioctl32(struct v4l2_subdev *sd,
 		}
 
 		ret = os02g10_ioctl(sd, cmd, hdr);
-		if (!ret)
+		if (!ret) {
 			ret = copy_to_user(up, hdr, sizeof(*hdr));
+			if (ret)
+				ret = -EFAULT;
+		}
 		kfree(hdr);
 		break;
 	case RKMODULE_SET_HDR_CFG:
@@ -672,32 +654,17 @@ static long os02g10_compat_ioctl32(struct v4l2_subdev *sd,
 			return ret;
 		}
 
-		ret = copy_from_user(hdr, up, sizeof(*hdr));
-		if (!ret)
-			ret = os02g10_ioctl(sd, cmd, hdr);
+		if (copy_from_user(hdr, up, sizeof(*hdr)))
+			return -EFAULT;
+
+		ret = os02g10_ioctl(sd, cmd, hdr);
 		kfree(hdr);
 		break;
-	case PREISP_CMD_SET_HDRAE_EXP:
-		hdrae = kzalloc(sizeof(*hdrae), GFP_KERNEL);
-		if (!hdrae) {
-			ret = -ENOMEM;
-			return ret;
-		}
-
-		ret = copy_from_user(hdrae, up, sizeof(*hdrae));
-		if (!ret)
-			ret = os02g10_ioctl(sd, cmd, hdrae);
-		kfree(hdrae);
-		break;
-	case RKMODULE_SET_CONVERSION_GAIN:
-		ret = copy_from_user(&cg, up, sizeof(cg));
-		if (!ret)
-			ret = os02g10_ioctl(sd, cmd, &cg);
-		break;
 	case RKMODULE_SET_QUICK_STREAM:
-		ret = copy_from_user(&stream, up, sizeof(u32));
-		if (!ret)
-			ret = os02g10_ioctl(sd, cmd, &stream);
+		if (copy_from_user(&stream, up, sizeof(u32)))
+			return -EFAULT;
+
+		ret = os02g10_ioctl(sd, cmd, &stream);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;
@@ -710,18 +677,17 @@ static long os02g10_compat_ioctl32(struct v4l2_subdev *sd,
 
 static int __os02g10_start_stream(struct os02g10 *os02g10)
 {
-	int ret;
+	int ret = 0;
 
-	ret = os02g10_write_reg(os02g10->client, 0xfd, 0x00);
+	ret |= os02g10_write_reg(os02g10->client, 0xfd, 0x00);
 	ret |= os02g10_write_reg(os02g10->client, 0x36, 0x01);
 	ret |= os02g10_write_reg(os02g10->client, 0xfd, 0x00);
 	ret |= os02g10_write_reg(os02g10->client, 0x36, 0x00);
 	ret |= os02g10_write_reg(os02g10->client, 0xfd, 0x00);
-	ret |= os02g10_write_reg(os02g10->client, 0x20, 0x00);
 
 	usleep_range(5000, 6000);
 
-	ret = os02g10_write_array(os02g10->client, os02g10->cur_mode->reg_list);
+	ret |= os02g10_write_array(os02g10->client, os02g10->cur_mode->reg_list);
 	if (ret)
 		return ret;
 
@@ -1101,11 +1067,17 @@ static int os02g10_set_ctrl(struct v4l2_ctrl *ctrl)
 			os02g10->flip &= ~MIRROR_BIT_MASK;
 
 		ret = os02g10_write_reg(os02g10->client,
-		                        OS02G10_REG_PAGE_SELECT, 0x01);
+					OS02G10_REG_PAGE_SELECT, 0x01);
 		ret |= os02g10_write_reg(os02g10->client,
-		                         OS02G10_FLIP_REG, os02g10->flip);
+					OS02G10_FLIP_REG, os02g10->flip);
 		ret |= os02g10_write_reg(os02g10->client,
-		                         OS02G10_REG_RESTART, 0x01);
+					OS02G10_REG_PAGE_SELECT, 0x02);
+		ret |= os02g10_write_reg(os02g10->client,
+					OS02G10_REG_BAYER_ORDER, 0x32);
+		ret |= os02g10_write_reg(os02g10->client,
+					OS02G10_REG_PAGE_SELECT, 0x01);
+		ret |= os02g10_write_reg(os02g10->client,
+					OS02G10_REG_RESTART, 0x01);
 		dev_dbg(&client->dev, "set hflip 0x%x\n", os02g10->flip);
 		break;
 	case V4L2_CID_VFLIP:
@@ -1115,11 +1087,17 @@ static int os02g10_set_ctrl(struct v4l2_ctrl *ctrl)
 			os02g10->flip &= ~FLIP_BIT_MASK;
 
 		ret = os02g10_write_reg(os02g10->client,
-		                        OS02G10_REG_PAGE_SELECT, 0x01);
+					OS02G10_REG_PAGE_SELECT, 0x01);
 		ret |= os02g10_write_reg(os02g10->client,
-		                         OS02G10_FLIP_REG, os02g10->flip);
+					OS02G10_FLIP_REG, os02g10->flip);
 		ret |= os02g10_write_reg(os02g10->client,
-		                         OS02G10_REG_RESTART, 0x01);
+					OS02G10_REG_PAGE_SELECT, 0x02);
+		ret |= os02g10_write_reg(os02g10->client,
+					OS02G10_REG_BAYER_ORDER, 0x32);
+		ret |= os02g10_write_reg(os02g10->client,
+					OS02G10_REG_PAGE_SELECT, 0x01);
+		ret |= os02g10_write_reg(os02g10->client,
+					OS02G10_REG_RESTART, 0x01);
 		dev_dbg(&client->dev, "set vflip 0x%x\n", os02g10->flip);
 		break;
 	default:
@@ -1154,8 +1132,9 @@ static int os02g10_initialize_controls(struct os02g10 *os02g10)
 	handler->lock = &os02g10->mutex;
 
 	os02g10->link_freq = v4l2_ctrl_new_int_menu(handler, NULL,
-	                     V4L2_CID_LINK_FREQ,
-	                     1, 0, link_freq_menu_items);
+						    V4L2_CID_LINK_FREQ,
+						    1, 0,
+						    link_freq_menu_items);
 
 	if (os02g10->cur_mode->bus_fmt == MEDIA_BUS_FMT_SBGGR10_1X10) {
 		dst_link_freq = 0;
@@ -1163,42 +1142,42 @@ static int os02g10_initialize_controls(struct os02g10 *os02g10)
 	}
 	/* pixel rate = link frequency * 2 * lanes / BITS_PER_SAMPLE */
 	os02g10->pixel_rate = v4l2_ctrl_new_std(handler, NULL,
-	                                        V4L2_CID_PIXEL_RATE,
-	                                        0, PIXEL_RATE_WITH_360M,
-	                                        1, dst_pixel_rate);
+						V4L2_CID_PIXEL_RATE,
+						0, PIXEL_RATE_WITH_360M,
+						1, dst_pixel_rate);
 
 	__v4l2_ctrl_s_ctrl(os02g10->link_freq,
 	                   dst_link_freq);
 
 	h_blank = mode->hts_def - mode->width;
 	os02g10->hblank = v4l2_ctrl_new_std(handler, NULL, V4L2_CID_HBLANK,
-	                                    h_blank, h_blank, 1, h_blank);
+					    h_blank, h_blank, 1, h_blank);
 	if (os02g10->hblank)
 		os02g10->hblank->flags |= V4L2_CTRL_FLAG_READ_ONLY;
 
 	vblank_def = mode->vts_def - mode->height;
 	os02g10->vblank = v4l2_ctrl_new_std(handler, &os02g10_ctrl_ops,
-	                                    V4L2_CID_VBLANK, vblank_def,
-	                                    OS02G10_VTS_MAX - mode->height,
-	                                    1, vblank_def);
+					    V4L2_CID_VBLANK, vblank_def,
+					    OS02G10_VTS_MAX - mode->height,
+					    1, vblank_def);
 
 	exposure_max = mode->vts_def - 8;
 	os02g10->exposure = v4l2_ctrl_new_std(handler, &os02g10_ctrl_ops,
-	                                      V4L2_CID_EXPOSURE, OS02G10_EXPOSURE_MIN,
-	                                      exposure_max, OS02G10_EXPOSURE_STEP,
-	                                      mode->exp_def);
+					      V4L2_CID_EXPOSURE, OS02G10_EXPOSURE_MIN,
+					      exposure_max, OS02G10_EXPOSURE_STEP,
+					      mode->exp_def);
 
 	os02g10->anal_gain = v4l2_ctrl_new_std(handler, &os02g10_ctrl_ops,
-	                                       V4L2_CID_ANALOGUE_GAIN, OS02G10_GAIN_MIN,
-	                                       OS02G10_GAIN_MAX, OS02G10_GAIN_STEP,
-	                                       OS02G10_GAIN_DEFAULT);
+					      V4L2_CID_ANALOGUE_GAIN, OS02G10_GAIN_MIN,
+					      OS02G10_GAIN_MAX, OS02G10_GAIN_STEP,
+					      OS02G10_GAIN_DEFAULT);
 
-	os02g10->h_flip = v4l2_ctrl_new_std(handler, &os02g10_ctrl_ops,
-	                                    V4L2_CID_HFLIP, 0, 1, 1, 0);
+	v4l2_ctrl_new_std(handler, &os02g10_ctrl_ops, V4L2_CID_HFLIP, 0, 1, 1, 0);
 
-	os02g10->v_flip = v4l2_ctrl_new_std(handler, &os02g10_ctrl_ops,
-	                                    V4L2_CID_VFLIP, 0, 1, 1, 0);
+	v4l2_ctrl_new_std(handler, &os02g10_ctrl_ops, V4L2_CID_VFLIP, 0, 1, 1, 0);
+
 	os02g10->flip = 0;
+
 	if (handler->error) {
 		ret = handler->error;
 		dev_err(&os02g10->client->dev,
@@ -1245,8 +1224,8 @@ static int os02g10_configure_regulators(struct os02g10 *os02g10)
 		os02g10->supplies[i].supply = OS02G10_supply_names[i];
 
 	return devm_regulator_bulk_get(&os02g10->client->dev,
-	                               OS02G10_NUM_SUPPLIES,
-	                               os02g10->supplies);
+				       OS02G10_NUM_SUPPLIES,
+				       os02g10->supplies);
 }
 
 static int os02g10_probe(struct i2c_client *client,

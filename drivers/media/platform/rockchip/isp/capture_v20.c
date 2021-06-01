@@ -116,6 +116,16 @@ static const struct capture_fmt dmatx_fmts[] = {
 		.fmt_type = FMT_YUV,
 		.bpp = { 16 },
 		.mplanes = 1,
+	}, {
+		.fourcc = V4l2_PIX_FMT_EBD8,
+		.fmt_type = FMT_EBD,
+		.bpp = { 8 },
+		.mplanes = 1,
+	}, {
+		.fourcc = V4l2_PIX_FMT_SPD16,
+		.fmt_type = FMT_SPD,
+		.bpp = { 16 },
+		.mplanes = 1,
 	}
 };
 
@@ -555,7 +565,7 @@ static int rkisp_stream_config_dcrop(struct rkisp_stream *stream, bool async)
 	src_h = input_win->height;
 
 	if (dev->isp_ver == ISP_V20 &&
-	    dev->csi_dev.rd_mode == HDR_RDBK_FRAME1 &&
+	    dev->rd_mode == HDR_RDBK_FRAME1 &&
 	    dev->isp_sdev.in_fmt.fmt_type == FMT_BAYER &&
 	    dev->isp_sdev.out_fmt.fmt_type == FMT_YUV)
 		src_h += RKMODULE_EXTEND_LINE;
@@ -1385,6 +1395,13 @@ static int mi_frame_end(struct rkisp_stream *stream)
 			ns = ktime_get_ns();
 		vb2_buf->timestamp = ns;
 
+		ns = ktime_get_ns();
+		stream->dbg.interval = ns - stream->dbg.timestamp;
+		stream->dbg.timestamp = ns;
+		stream->dbg.id = stream->curr_buf->vb.sequence;
+		if (stream->id == RKISP_STREAM_MP || stream->id == RKISP_STREAM_SP)
+			stream->dbg.delay = ns - dev->isp_sdev.frm_timestamp;
+
 		if (is_rdbk_stream(stream) &&
 		    dev->dmarx_dev.trigger == T_MANUAL) {
 			if (stream->id == RKISP_STREAM_DMATX0) {
@@ -1965,6 +1982,7 @@ static int rkisp_init_vb2_queue(struct vb2_queue *q,
 	q->bidirectional = 1;
 	if (stream->ispdev->hw_dev->is_dma_contig)
 		q->dma_attrs = DMA_ATTR_FORCE_CONTIGUOUS;
+	q->gfp_flags = GFP_DMA32;
 	return vb2_queue_init(q);
 }
 
@@ -2187,6 +2205,9 @@ void rkisp_mi_v20_isr(u32 mis_val, struct rkisp_device *dev)
 			end_tx1 = true;
 		if (i == RKISP_STREAM_DMATX2)
 			end_tx2 = true;
+		/* DMATX3 no csi frame end isr, mi isr instead */
+		if (i == RKISP_STREAM_DMATX3)
+			atomic_inc(&stream->sequence);
 
 		mi_frame_end_int_clear(stream);
 
@@ -2218,7 +2239,7 @@ void rkisp_mi_v20_isr(u32 mis_val, struct rkisp_device *dev)
 				end_tx0 = false;
 				end_tx1 = false;
 				end_tx2 = false;
-				rkisp_trigger_read_back(&dev->csi_dev, false, false);
+				rkisp_trigger_read_back(dev, false, false, false);
 			}
 		}
 	}
@@ -2232,17 +2253,28 @@ void rkisp_mipi_v20_isr(unsigned int phy, unsigned int packet,
 {
 	struct v4l2_device *v4l2_dev = &dev->v4l2_dev;
 	struct rkisp_stream *stream;
+	u32 packet_err = PACKET_ERR_F_BNDRY_MATCG | PACKET_ERR_F_SEQ |
+		PACKET_ERR_FRAME_DATA | PACKET_ERR_ECC_1BIT |
+		PACKET_ERR_ECC_2BIT | PACKET_ERR_CHECKSUM;
+	u32 state_err = RAW_WR_SIZE_ERR | RAW_RD_SIZE_ERR;
 	int i;
 
 	v4l2_dbg(3, rkisp_debug, &dev->v4l2_dev,
 		 "csi state:0x%x\n", state);
-	if (phy && (dev->isp_inp & INP_CSI))
+	dev->csi_dev.irq_cnt++;
+	if (phy && (dev->isp_inp & INP_CSI) &&
+	    dev->csi_dev.err_cnt++ < RKISP_CONTI_ERR_MAX)
 		v4l2_warn(v4l2_dev, "MIPI error: phy: 0x%08x\n", phy);
-	if (packet && (dev->isp_inp & INP_CSI))
+	if ((packet & packet_err) && (dev->isp_inp & INP_CSI) &&
+	    dev->csi_dev.err_cnt < RKISP_CONTI_ERR_MAX) {
+		if (packet & 0xfff)
+			dev->csi_dev.err_cnt++;
 		v4l2_warn(v4l2_dev, "MIPI error: packet: 0x%08x\n", packet);
-	if (overflow)
+	}
+	if (overflow &&
+	    dev->csi_dev.err_cnt++ < RKISP_CONTI_ERR_MAX)
 		v4l2_warn(v4l2_dev, "MIPI error: overflow: 0x%08x\n", overflow);
-	if (state & 0xeff00)
+	if (state & state_err)
 		v4l2_warn(v4l2_dev, "MIPI error: size: 0x%08x\n", state);
 	if (state & MIPI_DROP_FRM)
 		v4l2_warn(v4l2_dev, "MIPI drop frame\n");
@@ -2260,6 +2292,7 @@ void rkisp_mipi_v20_isr(unsigned int phy, unsigned int packet,
 		}
 	}
 	if (state & (RAW0_WR_FRAME | RAW1_WR_FRAME | RAW2_WR_FRAME)) {
+		dev->csi_dev.err_cnt = 0;
 		for (i = 0; i < HDR_DMA_MAX; i++) {
 			if (!((RAW0_WR_FRAME << i) & state))
 				continue;
@@ -2275,4 +2308,18 @@ void rkisp_mipi_v20_isr(unsigned int phy, unsigned int packet,
 	if (state & (RAW0_Y_STATE | RAW1_Y_STATE | RAW2_Y_STATE |
 	    RAW0_WR_FRAME | RAW1_WR_FRAME | RAW2_WR_FRAME))
 		rkisp_luma_isr(&dev->luma_vdev, state);
+
+	if (dev->csi_dev.err_cnt > RKISP_CONTI_ERR_MAX) {
+		if (!(dev->isp_state & ISP_MIPI_ERROR)) {
+			dev->isp_state |= ISP_MIPI_ERROR;
+			rkisp_write(dev, CSI2RX_MASK_PHY, 0, true);
+			rkisp_write(dev, CSI2RX_MASK_PACKET, 0, true);
+			rkisp_write(dev, CSI2RX_MASK_OVERFLOW, 0, true);
+			if (dev->hw_dev->monitor.is_en) {
+				if (!completion_done(&dev->hw_dev->monitor.cmpl))
+					complete(&dev->hw_dev->monitor.cmpl);
+				dev->hw_dev->monitor.state |= ISP_MIPI_ERROR;
+			}
+		}
+	}
 }

@@ -2254,6 +2254,12 @@ static int rk3568_usb2phy_tuning(struct rockchip_usb2phy *rphy)
 	writel(reg, rphy->phy_base + 0x0400);
 
 	if (rphy->phy_cfg->reg == 0xfe8a0000) {
+		/* Set otg port HS eye height to 437.5mv(default is 400mv) */
+		reg = readl(rphy->phy_base + 0x30);
+		reg &= ~(0x07 << 4);
+		reg |= (0x06 << 4);
+		writel(reg, rphy->phy_base + 0x30);
+
 		/*
 		 * Set the bvalid filter time to 10ms
 		 * based on the usb2 phy grf pclk 100MHz.
@@ -2305,7 +2311,7 @@ static int rockchip_usb2phy_pm_suspend(struct device *dev)
 			continue;
 
 		if (rport->port_id == USB2PHY_PORT_OTG &&
-		    rport->id_irq > 0) {
+		    (rport->id_irq > 0 || rphy->irq > 0)) {
 			mutex_lock(&rport->mutex);
 			rport->prev_iddig = property_enabled(rphy->grf,
 						&rport->port_cfg->utmi_iddig);
@@ -2363,7 +2369,7 @@ static int rockchip_usb2phy_pm_resume(struct device *dev)
 			continue;
 
 		if (rport->port_id == USB2PHY_PORT_OTG &&
-		    rport->id_irq > 0) {
+		    (rport->id_irq > 0 || rphy->irq > 0)) {
 			mutex_lock(&rport->mutex);
 			iddig = property_enabled(rphy->grf,
 						 &rport->port_cfg->utmi_iddig);

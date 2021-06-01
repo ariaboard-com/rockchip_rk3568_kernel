@@ -102,6 +102,7 @@
 		 * - SDIO_RESET_L_WL_REG_ON
 		 * - PDN (power down when low)
 		 */
+		post-power-on-delay-ms = <200>;
 		reset-gpios = <&gpio2 RK_PB1 GPIO_ACTIVE_LOW>;
 	};
 
@@ -237,6 +238,7 @@
 		regulator-name = "vdd_cpu";
 		regulator-min-microvolt = <712500>;
 		regulator-max-microvolt = <1390000>;
+		regulator-init-microvolt = <900000>;
 		regulator-ramp-delay = <2300>;
 		fcs,suspend-voltage-selector = <1>;
 		regulator-boot-on;
@@ -548,7 +550,7 @@
 
 &i2c2 {
 	status = "okay";
-	wacom: wacom@09 {
+	wacom: wacom@9 {
 		compatible = "wacom,w9013";
 		reg = <0x09>;
 		pinctrl-names = "default";
@@ -675,7 +677,7 @@
 &i2c5 {
 	status = "disabled";
 
-	kxtj: kxtj3@0e {
+	kxtj: kxtj3@e {
 		status = "disabled";
 		compatible = "gs_kxtj9";
 		pinctrl-names = "default";
@@ -826,10 +828,10 @@
 	pmuio2-supply = <&vcc3v3_pmu>;
 	vccio1-supply = <&vccio_acodec>;
 	vccio3-supply = <&vccio_sd>;
-	vccio4-supply = <&vcca1v8_pmu>;
+	vccio4-supply = <&vcc_3v3>;
 	vccio5-supply = <&vcc_3v3>;
 	vccio6-supply = <&vcc_3v3>;
-	vccio7-supply = <&vcc1v8_dvp>;
+	vccio7-supply = <&vcc_3v3>;
 };
 
 &pwm4 {

@@ -65,6 +65,7 @@
 
 #define RKCIF_DEFAULT_WIDTH	640
 #define RKCIF_DEFAULT_HEIGHT	480
+#define RKCIF_FS_DETECTED_NUM	2
 
 /*
  * for HDR mode sync buf
@@ -362,6 +363,7 @@ struct rkcif_timer {
 	bool			is_buf_stop_update;
 	bool			is_running;
 	bool			is_csi2_err_occurred;
+	bool			has_been_init;
 	enum rkcif_monitor_mode	monitor_mode;
 	enum rkmodule_reset_src	reset_src;
 };
@@ -415,6 +417,8 @@ struct rkcif_stream {
 	struct rkcif_fps_stats		fps_stats;
 	struct rkcif_extend_info	extend_line;
 	bool				is_dvp_yuv_addr_init;
+	bool				is_fs_fe_not_paired;
+	unsigned int			fs_cnt_in_single_frame;
 };
 
 struct rkcif_lvds_subdev {
@@ -514,7 +518,6 @@ struct rkcif_device {
 	struct rkcif_work_struct	reset_work;
 	bool				reset_work_cancel;
 	struct rkcif_timer		reset_watchdog_timer;
-	struct work_struct		async_register_work;
 	unsigned int			buf_wake_up_cnt;
 
 	bool				iommu_en;
@@ -560,5 +563,5 @@ void rkcif_reset_watchdog_timer_handler(struct timer_list *t);
 void rkcif_config_dvp_clk_sampling_edge(struct rkcif_device *dev,
 					enum rkcif_clk_edge edge);
 void rkcif_enable_dvp_clk_dual_edge(struct rkcif_device *dev, bool on);
-
+void rkcif_reset_work(struct work_struct *work);
 #endif
