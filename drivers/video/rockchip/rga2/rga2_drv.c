@@ -531,7 +531,7 @@ static inline u32 rga2_read(u32 r)
 static inline int rga2_init_version(void)
 {
 	struct rga2_drvdata_t *rga = rga2_drvdata;
-	u32 major_version, minor_version;
+	u32 major_version, minor_version, svn_version;
 	u32 reg_version;
 
 	if (!rga) {
@@ -556,13 +556,14 @@ static inline int rga2_init_version(void)
 
 	major_version = (reg_version & RGA2_MAJOR_VERSION_MASK) >> 24;
 	minor_version = (reg_version & RGA2_MINOR_VERSION_MASK) >> 20;
+	svn_version = (reg_version & RGA2_SVN_VERSION_MASK);
 
 	/*
 	 * some old rga ip has no rga version register, so force set to 2.00
 	 */
 	if (!major_version && !minor_version)
 		major_version = 2;
-	sprintf(rga->version, "%d.%02d", major_version, minor_version);
+	snprintf(rga->version, 10, "%x.%01x.%05x", major_version, minor_version, svn_version);
 
 	return 0;
 }
@@ -871,7 +872,7 @@ static struct rga2_reg * rga2_reg_init(rga2_session *session, struct rga2_req *r
         }
     }
 
-    if(RGA2_gen_reg_info((uint8_t *)reg->cmd_reg, req) == -1) {
+    if (RGA2_gen_reg_info((uint8_t *)reg->cmd_reg, (uint8_t *)reg->csc_reg, req) == -1) {
         printk("gen reg info error\n");
         free_page((unsigned long)reg);
 
@@ -934,6 +935,7 @@ static void rga2_service_session_clear(rga2_session *session)
 /* Caller must hold rga_service.lock */
 static void rga2_try_set_reg(void)
 {
+	int i;
 	struct rga2_reg *reg ;
 
 	if (list_empty(&rga2_service.running))
@@ -958,13 +960,26 @@ static void rga2_try_set_reg(void)
 			/* CMD buff */
 			rga2_write(virt_to_phys(reg->cmd_reg), RGA2_CMD_BASE);
 
+			/* full csc reg */
+			for (i = 0; i < 12; i++) {
+				rga2_write(reg->csc_reg[i], RGA2_CSC_COE_BASE + i * 4);
+			}
+
 #if RGA2_DEBUGFS
 			if (RGA2_TEST_REG) {
 				if (rga2_flag) {
-					int32_t i, *p;
+					int32_t *p;
+
 					p = rga2_service.cmd_buff;
 					INFO("CMD_REG\n");
 					for (i=0; i<8; i++)
+						INFO("%.8x %.8x %.8x %.8x\n",
+						     p[0 + i * 4], p[1 + i * 4],
+						     p[2 + i * 4], p[3 + i * 4]);
+
+					p = reg->csc_reg;
+					INFO("CSC_REG\n");
+					for (i = 0; i < 3; i++)
 						INFO("%.8x %.8x %.8x %.8x\n",
 						     p[0 + i * 4], p[1 + i * 4],
 						     p[2 + i * 4], p[3 + i * 4]);
@@ -989,7 +1004,6 @@ static void rga2_try_set_reg(void)
 #if RGA2_DEBUGFS
 			if (RGA2_TEST_REG) {
 				if (rga2_flag) {
-					uint32_t i;
 					INFO("CMD_READ_BACK_REG\n");
 					for (i=0; i<8; i++)
 						INFO("%.8x %.8x %.8x %.8x\n",
@@ -997,6 +1011,14 @@ static void rga2_try_set_reg(void)
 						     rga2_read(0x100 + i * 16 + 4),
 						     rga2_read(0x100 + i * 16 + 8),
 						     rga2_read(0x100 + i * 16 + 12));
+
+					INFO("CSC_READ_BACK_REG\n");
+					for (i = 0; i < 3; i++)
+						INFO("%.8x %.8x %.8x %.8x\n",
+						     rga2_read(RGA2_CSC_COE_BASE + i * 16 + 0),
+						     rga2_read(RGA2_CSC_COE_BASE + i * 16 + 4),
+						     rga2_read(RGA2_CSC_COE_BASE + i * 16 + 8),
+						     rga2_read(RGA2_CSC_COE_BASE + i * 16 + 12));
 				}
 
 			}
@@ -1676,6 +1698,8 @@ static long rga_ioctl(struct file *file, uint32_t cmd, unsigned long arg)
 	struct rga2_req req, req_first;
 	struct rga_req req_rga;
 	int ret = 0;
+	int major_version = 0, minor_version = 0;
+	char version[16] = {0};
 	rga2_session *session;
 
 	if (!rga) {
@@ -1828,12 +1852,25 @@ static long rga_ioctl(struct file *file, uint32_t cmd, unsigned long arg)
 			ret = rga2_get_result(session, arg);
 			break;
 		case RGA_GET_VERSION:
-		case RGA2_GET_VERSION:
+			sscanf(rga->version, "%x.%x.%*x", &major_version, &minor_version);
+			snprintf(version, 5, "%x.%02x", major_version, minor_version);
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
-			ret = copy_to_user((void *)arg, rga->version, 16);
+			ret = copy_to_user((void *)arg, version, sizeof(rga->version));
 #else
 			ret = copy_to_user((void *)arg, RGA2_VERSION, sizeof(RGA2_VERSION));
 #endif
+			if (ret != 0)
+				ret = -EFAULT;
+			break;
+		case RGA2_GET_VERSION:
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+			ret = copy_to_user((void *)arg, rga->version, sizeof(rga->version));
+#else
+			ret = copy_to_user((void *)arg, RGA2_VERSION, sizeof(RGA2_VERSION));
+#endif
+			if (ret != 0)
+				ret = -EFAULT;
 			break;
 		default:
 			ERR("unknown ioctl cmd!\n");
@@ -1972,10 +2009,12 @@ static long compat_rga_ioctl(struct file *file, uint32_t cmd, unsigned long arg)
 		case RGA_GET_VERSION:
 		case RGA2_GET_VERSION:
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
-				ret = copy_to_user((void *)arg, rga->version, 16);
+			ret = copy_to_user((void *)arg, rga->version, 16);
 #else
-				ret = copy_to_user((void *)arg, RGA2_VERSION, sizeof(RGA2_VERSION));
+			ret = copy_to_user((void *)arg, RGA2_VERSION, sizeof(RGA2_VERSION));
 #endif
+			if (ret != 0)
+				ret = -EFAULT;
 			break;
 		default:
 			ERR("unknown ioctl cmd!\n");

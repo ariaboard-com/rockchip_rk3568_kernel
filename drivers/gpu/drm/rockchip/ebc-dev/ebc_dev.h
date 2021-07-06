@@ -75,6 +75,7 @@ enum panel_refresh_mode {
 	EPD_SUSPEND		= 15,
 	EPD_RESUME		= 16,
 	EPD_POWER_OFF		= 17,
+	EPD_FORCE_FULL		= 18,
 };
 
 /*

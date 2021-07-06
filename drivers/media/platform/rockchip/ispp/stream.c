@@ -1505,7 +1505,7 @@ static void rkispp_buf_queue(struct vb2_buffer *vb)
 	memset(isppbuf->buff_addr, 0, sizeof(isppbuf->buff_addr));
 	for (i = 0; i < cap_fmt->mplanes; i++) {
 		vb2_plane_vaddr(vb, i);
-		if (stream->isppdev->hw_dev->is_mmu) {
+		if (stream->isppdev->hw_dev->is_dma_sg_ops) {
 			sgt = vb2_dma_sg_plane_desc(vb, i);
 			isppbuf->buff_addr[i] = sg_dma_address(sgt->sgl);
 		} else {
@@ -1810,6 +1810,7 @@ free_dummy_buf:
 	rkispp_free_common_dummy_buf(stream->isppdev);
 free_buf_queue:
 	destroy_buf_queue(stream, VB2_BUF_STATE_QUEUED);
+	rkispp_destroy_buf(stream);
 	atomic_dec(&dev->stream_vdev.refcnt);
 	stream->streaming = false;
 	stream->is_upd = false;
