@@ -243,6 +243,10 @@
     status = "okay";
 };
 
+&rgmii_phy1 {
+	led_status_value = <0x2f60>;
+};
+
  &sfc{
      rk3566-fspi = "two-line" ;
      status = "disabled";

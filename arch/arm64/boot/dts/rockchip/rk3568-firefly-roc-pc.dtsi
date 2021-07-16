@@ -247,6 +247,14 @@
     status = "okay";
 };
 
+&rgmii_phy0 {
+	led_status_value = <0x6940>;
+};
+
+&rgmii_phy1 {
+	led_status_value = <0x6940>;
+};
+
 &uart8 {
 	status = "okay";
 };
