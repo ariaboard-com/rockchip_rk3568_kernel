@@ -13,6 +13,7 @@
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+#define RTL_8211F_PHY_ID  0x001cc916
 
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -41,6 +42,9 @@
 MODULE_DESCRIPTION("PHY library");
 MODULE_AUTHOR("Andy Fleming");
 MODULE_LICENSE("GPL");
+
+/* Set led status */
+static unsigned int led_value = 0x0;
 
 void phy_device_free(struct phy_device *phydev)
 {
@@ -1884,6 +1888,25 @@ static void of_set_phy_eee_broken(struct phy_device *phydev)
 	phydev->eee_broken_modes = broken;
 }
 
+static int phy_rtl8211f_led_fixup(struct phy_device *phydev)
+{
+	int value;
+	dev_info(&phydev->mdio.dev, "%s\n", __func__);
+
+	value = phy_read(phydev, 31);
+	phy_write(phydev, 31, 0xd04);
+
+	mdelay(10);
+	value = phy_read(phydev, 16);
+	value = led_value;
+	phy_write(phydev, 16, value);
+
+	mdelay(10);
+	phy_read(phydev, 31);
+	phy_write(phydev, 31, 0x00);
+	return 0;
+}
+
 /**
  * phy_probe - probe and init a PHY device
  * @dev: device to probe and init
@@ -1898,6 +1921,7 @@ static int phy_probe(struct device *dev)
 	struct device_driver *drv = phydev->mdio.dev.driver;
 	struct phy_driver *phydrv = to_phy_driver(drv);
 	int err = 0;
+	int ret;
 
 	phydev->drv = phydrv;
 
@@ -1957,6 +1981,15 @@ static int phy_probe(struct device *dev)
 			/* Assert the reset signal */
 			phy_device_reset(phydev, 1);
 		}
+	}
+
+	/* Set led status */
+	ret = of_property_read_u32(dev->of_node, "led_status_value", &led_value);
+	if(ret) {
+		dev_info(&phydev->mdio.dev, "[%s-%d] led_status_value normal\n", __func__, __LINE__);
+	}else {
+		phy_register_fixup_for_uid(RTL_8211F_PHY_ID, 0xffffffff, phy_rtl8211f_led_fixup);
+		dev_info(&phydev->mdio.dev, "[%s-%d] led_status_value = 0x%x\n", __func__, __LINE__, led_value);
 	}
 
 	mutex_unlock(&phydev->lock);
