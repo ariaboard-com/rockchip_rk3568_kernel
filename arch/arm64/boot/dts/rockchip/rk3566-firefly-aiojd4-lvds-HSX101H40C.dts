@@ -12,7 +12,7 @@
 #include "lcd-mipi-to-lvds-HSX101H40C.dtsi"
 
 / {
-    model = "AIO-3566JD4 lvds HSX101H40C (Android)";
+    model = "AIO-3566JD4 lvds HSX101H40C (Linux)";
     compatible = "rockchip,rk3566-firefly-aiojd4-lvds-HSX101H40C", "rockchip,rk3566";
 
 };

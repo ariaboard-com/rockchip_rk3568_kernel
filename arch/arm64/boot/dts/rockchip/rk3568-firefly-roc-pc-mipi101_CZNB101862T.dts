@@ -9,7 +9,7 @@
 #include "rk3568-firefly-roc-pc.dtsi"
 
 / {
-	model = "ROC-RK3568-PC MIPI CZNB101862T (Android)";
+	model = "ROC-RK3568-PC MIPI CZNB101862T (Linux)";
 	compatible = "rockchip,rk3568-firefly-roc-pc", "rockchip,rk3568";
 
 	vcc_lcd0_power: vcc-lcd0-power-regulator {
