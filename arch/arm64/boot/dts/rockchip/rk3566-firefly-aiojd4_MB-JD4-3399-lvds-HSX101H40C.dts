@@ -8,11 +8,11 @@
 
 
 
-#include "rk3566-firefly-aiojd4.dtsi"
+#include "rk3566-firefly-aiojd4_MB-JD4-3399.dtsi"
 #include "lcd-mipi-to-lvds-HSX101H40C.dtsi"
 
 / {
-    model = "AIO-3566JD4 lvds HSX101H40C (Linux)";
+    model = "AIO-3566JD4_MB-JD4-3399 lvds HSX101H40C (Linux)";
     compatible = "rockchip,rk3566-firefly-aiojd4-lvds-HSX101H40C", "rockchip,rk3566";
 
 };
