@@ -1258,11 +1258,12 @@ static int xc7022_configure_regulators(struct xc7022 *xc7022)
 
 static void free_gpio(struct xc7022 *xc7022)
 {
-	dev_info(&xc7022->client->dev, "%s(%d)   ,%d enter!\n", __func__, __LINE__,desc_to_gpio(xc7022->reset_gpio));
-	if (IS_ERR(xc7022->reset_gpio)){
-		gpio_free(desc_to_gpio(xc7022->reset_gpio));
-	}
-
+	if (!IS_ERR(xc7022->pwdn_gpio))
+		gpio_free(desc_to_gpio(xc7022->pwdn_gpio));
+        if (!IS_ERR(xc7022->reset_gpio))
+                gpio_free(desc_to_gpio(xc7022->reset_gpio));
+        if (!IS_ERR(xc7022->mipi_pwr_gpio))
+		gpio_free(desc_to_gpio(xc7022->mipi_pwr_gpio));
 }
 
 static int xc7022_probe(struct i2c_client *client,
