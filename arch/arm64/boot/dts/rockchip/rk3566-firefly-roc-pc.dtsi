@@ -8,6 +8,8 @@
 #include "rk3566-diff.dtsi"
 
 /delete-node/ &hym8563;
+/delete-node/ &qos_sata2;
+/delete-node/ &sata2;
 
 / {
     sd_vcc3v3_power: sd-vcc3v3-power {
