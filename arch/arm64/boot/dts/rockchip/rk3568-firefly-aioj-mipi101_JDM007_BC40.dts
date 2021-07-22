@@ -100,7 +100,7 @@
 	connect = <&vp0_out_dsi0>;
 };
 
-&mipi_dphy0 {
+&video_phy0 {
 	status = "okay";
 };
 
@@ -129,7 +129,7 @@
 };
 
 /*
- * mipi_dphy0 needs to be enabled
+ * video_phy0 needs to be enabled
  * when dsi0 is enabled
  */
 &dsi0 {
