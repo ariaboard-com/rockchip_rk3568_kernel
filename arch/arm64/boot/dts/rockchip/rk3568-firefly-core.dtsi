@@ -603,6 +603,7 @@
 };
 
 &rkvenc {
+	venc-supply = <&vdd_logic>;
 	status = "okay";
 };
 
@@ -618,6 +619,12 @@
 
 &rknpu_mmu {
 	status = "disabled";
+};
+
+&bus_npu {
+	bus-supply = <&vdd_logic>;
+	pvtm-supply = <&vdd_cpu>;
+	status = "okay";
 };
 
 &saradc {
