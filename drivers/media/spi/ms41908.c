@@ -172,6 +172,7 @@ struct motor_dev {
 	struct dciris_dev *dciris;
 	int id;
 	int wait_cnt;
+	int pi_gpio_usecnt;
 };
 
 struct motor_work_s {
@@ -1315,7 +1316,8 @@ static int motor_set_zoom_follow(struct motor_dev *motor, struct rk_cam_set_zoom
 {
 	int i = 0;
 	int ret = 0;
-	bool is_need_reback = mv_param->is_need_reback;
+	bool is_need_zoom_reback = mv_param->is_need_zoom_reback;
+	bool is_need_focus_reback = mv_param->is_need_focus_reback;
 
 	for (i = 0; i < mv_param->setzoom_cnt; i++) {
 		if (i == (mv_param->setzoom_cnt - 1)) {
@@ -1324,13 +1326,13 @@ static int motor_set_zoom_follow(struct motor_dev *motor, struct rk_cam_set_zoom
 						       mv_param->zoom_pos[i].focus_pos,
 						       true,
 						       true,
-						       is_need_reback);
+						       is_need_zoom_reback);
 			ret = set_motor_running_status(motor,
 						       motor->zoom,
 						       mv_param->zoom_pos[i].zoom_pos,
 						       true,
 						       false,
-						       is_need_reback);
+						       is_need_focus_reback);
 		} else {
 			set_motor_running_status(motor,
 						 motor->focus,
@@ -1580,11 +1582,16 @@ static int motor_reinit_focus(struct motor_dev *motor)
 	int ret = 0;
 
 	if (!IS_ERR(motor->focus->pic_gpio)) {
-		if (!IS_ERR(motor->focus->pia_gpio))
-			gpiod_set_value(motor->focus->pia_gpio, 1);
-		if (!IS_ERR(motor->focus->pie_gpio))
-			gpiod_set_value(motor->focus->pie_gpio, 0);
-		msleep(250);
+		mutex_lock(&motor->mutex);
+		if (motor->pi_gpio_usecnt == 0) {
+			if (!IS_ERR(motor->focus->pia_gpio))
+				gpiod_set_value(motor->focus->pia_gpio, 1);
+			if (!IS_ERR(motor->focus->pie_gpio))
+				gpiod_set_value(motor->focus->pie_gpio, 0);
+			msleep(250);
+		}
+		motor->pi_gpio_usecnt++;
+		mutex_unlock(&motor->mutex);
 		#ifdef PI_TEST
 		motor->focus->last_pos = motor->focus->step_max;
 		ret = set_motor_running_status(motor,
@@ -1609,10 +1616,16 @@ static int motor_reinit_focus(struct motor_dev *motor)
 		motor->focus->min_pos = min;
 		motor->focus->max_pos = max;
 		#endif
-		if (!IS_ERR(motor->focus->pia_gpio))
-			gpiod_set_value(motor->focus->pia_gpio, 0);
-		if (!IS_ERR(motor->focus->pie_gpio))
-			gpiod_set_value(motor->focus->pie_gpio, 0);
+
+		mutex_lock(&motor->mutex);
+		if (motor->pi_gpio_usecnt == 1) {
+			if (!IS_ERR(motor->focus->pia_gpio))
+				gpiod_set_value(motor->focus->pia_gpio, 0);
+			if (!IS_ERR(motor->focus->pie_gpio))
+				gpiod_set_value(motor->focus->pie_gpio, 0);
+		}
+		motor->pi_gpio_usecnt--;
+		mutex_unlock(&motor->mutex);
 	} else {
 		motor->focus->last_pos = motor->focus->step_max;
 		ret = set_motor_running_status(motor,
@@ -1645,11 +1658,17 @@ static int  motor_reinit_zoom(struct motor_dev *motor)
 	int ret = 0;
 
 	if (!IS_ERR(motor->zoom->pic_gpio)) {
-		if (!IS_ERR(motor->focus->pia_gpio))
-			gpiod_set_value(motor->focus->pia_gpio, 1);
-		if (!IS_ERR(motor->focus->pie_gpio))
-			gpiod_set_value(motor->focus->pie_gpio, 0);
-		msleep(250);
+		mutex_lock(&motor->mutex);
+		if (motor->pi_gpio_usecnt == 0) {
+			if (!IS_ERR(motor->focus->pia_gpio))
+				gpiod_set_value(motor->focus->pia_gpio, 1);
+			if (!IS_ERR(motor->focus->pie_gpio))
+				gpiod_set_value(motor->focus->pie_gpio, 0);
+			msleep(250);
+		}
+		motor->pi_gpio_usecnt++;
+		mutex_unlock(&motor->mutex);
+
 		#ifdef PI_TEST
 		motor->zoom->last_pos = motor->zoom->step_max;
 		ret = set_motor_running_status(motor,
@@ -1674,10 +1693,16 @@ static int  motor_reinit_zoom(struct motor_dev *motor)
 		motor->zoom->min_pos = min;
 		motor->zoom->max_pos = max;
 		#endif
-		if (!IS_ERR(motor->focus->pia_gpio))
-			gpiod_set_value(motor->focus->pia_gpio, 0);
-		if (!IS_ERR(motor->focus->pie_gpio))
-			gpiod_set_value(motor->focus->pie_gpio, 0);
+
+		mutex_lock(&motor->mutex);
+		if (motor->pi_gpio_usecnt == 1) {
+			if (!IS_ERR(motor->focus->pia_gpio))
+				gpiod_set_value(motor->focus->pia_gpio, 0);
+			if (!IS_ERR(motor->focus->pie_gpio))
+				gpiod_set_value(motor->focus->pie_gpio, 0);
+		}
+		motor->pi_gpio_usecnt--;
+		mutex_unlock(&motor->mutex);
 	} else {
 		motor->zoom->last_pos = motor->zoom->step_max;
 		ret = set_motor_running_status(motor,
@@ -2561,6 +2586,7 @@ static void dev_param_init(struct motor_dev *motor)
 	motor->is_should_wait = false;
 	motor->is_timer_restart = false;
 	motor->wait_cnt = 0;
+	motor->pi_gpio_usecnt = 0;
 }
 
 static void dev_reg_init(struct motor_dev *motor)

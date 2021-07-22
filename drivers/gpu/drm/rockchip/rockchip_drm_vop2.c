@@ -711,6 +711,11 @@ static bool vop2_soc_is_rk3566(void)
 	return soc_is_rk3566();
 }
 
+static bool vop2_is_mirror_win(struct vop2_win *win)
+{
+	return soc_is_rk3566() && (win->feature & WIN_FEATURE_MIRROR);
+}
+
 static uint64_t vop2_soc_id_fixup(uint64_t soc_id)
 {
 	switch (soc_id) {
@@ -1096,13 +1101,44 @@ static inline void vop2_wb_cfg_done(struct vop2_video_port *vp)
 
 }
 
+static void vop2_win_multi_area_disable(struct vop2_win *parent)
+{
+	struct vop2 *vop2 = parent->vop2;
+	struct vop2_win *area;
+	int i;
+
+	for (i = 0; i < vop2->registered_num_wins; i++) {
+		area = &vop2->win[i];
+		if (area->parent == parent)
+			VOP_WIN_SET(vop2, area, enable, 0);
+	}
+}
+
 static void vop2_win_disable(struct vop2_win *win)
 {
 	struct vop2 *vop2 = win->vop2;
 
 	VOP_WIN_SET(vop2, win, enable, 0);
-	if (win->feature & WIN_FEATURE_CLUSTER_MAIN)
+	if (win->feature & WIN_FEATURE_CLUSTER_MAIN) {
+		struct vop2_win *sub_win;
+		int i = 0;
+
+		for (i = 0; i < vop2->registered_num_wins; i++) {
+			sub_win = &vop2->win[i];
+
+			if ((sub_win->phys_id == win->phys_id) &&
+			    (sub_win->feature & WIN_FEATURE_CLUSTER_SUB))
+				VOP_WIN_SET(vop2, sub_win, enable, 0);
+		}
+
 		VOP_CLUSTER_SET(vop2, win, enable, 0);
+	}
+
+	/*
+	 * disable all other multi area win if we want disable area0 here
+	 */
+	if (!win->parent && (win->feature & WIN_FEATURE_MULTI_AREA))
+		vop2_win_multi_area_disable(win);
 }
 
 static inline void vop2_write_lut(struct vop2 *vop2, uint32_t offset, uint32_t v)
@@ -2240,12 +2276,25 @@ static void vop2_crtc_load_lut(struct drm_crtc *crtc)
 	struct vop2_video_port *vp = to_vop2_video_port(crtc);
 	struct vop2 *vop2 = vp->vop2;
 	int dle = 0, i = 0;
+	u8 vp_enable_gamma_nr = 0;
 
 	if (!vop2->is_enabled || !vp->lut || !vop2->lut_regs)
 		return;
 
 	if (WARN_ON(!drm_modeset_is_locked(&crtc->mutex)))
 		return;
+
+	for (i = 0; i < vop2->data->nr_vps; i++) {
+		struct vop2_video_port *vp = &vop2->vps[i];
+
+		if (vp->gamma_lut_active)
+			vp_enable_gamma_nr++;
+	}
+
+	if (vop2->data->nr_gammas && vp_enable_gamma_nr >= vop2->data->nr_gammas) {
+		DRM_INFO("only support %d gamma\n", vop2->data->nr_gammas);
+		return;
+	}
 
 	spin_lock(&vop2->reg_lock);
 	VOP_MODULE_SET(vop2, vp, dsp_lut_en, 0);
@@ -2459,7 +2508,6 @@ static void vop2_layer_map_initial(struct vop2 *vop2, uint32_t current_vp_id)
 	const struct vop2_data *vop2_data = vop2->data;
 	struct vop2_layer *layer = &vop2->layers[0];
 	struct vop2_video_port *vp = &vop2->vps[0];
-	struct vop2_video_port *last_active_vp;
 	struct vop2_win *win;
 	const struct vop2_win_data *win_data = NULL;
 	uint32_t used_layers = 0;
@@ -2488,8 +2536,6 @@ static void vop2_layer_map_initial(struct vop2 *vop2, uint32_t current_vp_id)
 		if (!standby)
 			active_vp_mask |= BIT(i);
 	}
-
-	last_active_vp = &vop2->vps[fls(active_vp_mask) - 1];
 
 	for (i = 0; i < vop2->data->nr_vps; i++) {
 		vp = &vop2->vps[i];
@@ -2522,7 +2568,8 @@ static void vop2_layer_map_initial(struct vop2 *vop2, uint32_t current_vp_id)
 	}
 
 	/* the last VP is fixed */
-	port_mux_cfg |= 7 << (4 * (vop2->data->nr_vps - 1));
+	if (vop2->data->nr_vps >= 1)
+		port_mux_cfg |= 7 << (4 * (vop2->data->nr_vps - 1));
 	vop2->port_mux_cfg = port_mux_cfg;
 	VOP_CTRL_SET(vop2, ovl_port_mux_cfg, port_mux_cfg);
 
@@ -4894,7 +4941,8 @@ static void vop2_setup_layer_mixer_for_vp(struct vop2_video_port *vp,
 			prev_vp->bg_ovl_dly = (vop2_data->nr_mixers - port_mux) << 1;
 	}
 
-	port_mux_cfg |= 7 << (4 * (vop2->data->nr_vps - 1));
+	if (vop2->data->nr_vps >= 1)
+		port_mux_cfg |= 7 << (4 * (vop2->data->nr_vps - 1));
 
 	/*
 	 * Win and layer must map one by one, if a win is selected
@@ -4931,6 +4979,13 @@ static void vop2_setup_layer_mixer_for_vp(struct vop2_video_port *vp,
 	vop2_setup_port_mux(vp, port_mux_cfg);
 }
 
+/*
+ * HDR window is fixed(not move in the overlay path with port_mux change)
+ * and is the most slow window. And the bg is the fast. So other windows
+ * and bg need to add delay number to keep align with the most slow window.
+ * The delay number list in the trm is a relative value for port_mux set at
+ * last level.
+ */
 static void vop2_setup_dly_for_vp(struct vop2_video_port *vp)
 {
 	struct vop2 *vop2 = vp->vop2;
@@ -4955,7 +5010,8 @@ static void vop2_setup_dly_for_vp(struct vop2_video_port *vp)
 		}
 	}
 
-	bg_dly -= vp->bg_ovl_dly;
+	if (!vp->hdr_in)
+		bg_dly -= vp->bg_ovl_dly;
 
 	pre_scan_dly = bg_dly + (hdisplay >> 1) - 1;
 	pre_scan_dly = (pre_scan_dly << 16) | hsync_len;
@@ -4978,12 +5034,15 @@ static void vop2_setup_dly_for_window(struct vop2_video_port *vp, const struct v
 		win = vop2_find_win_by_phys_id(vop2, zpos->win_phys_id);
 		plane = &win->base;
 		vpstate = to_vop2_plane_state(plane->state);
-		if (vp->hdr_in && !vp->hdr_out && !vpstate->hdr_in)
+		if (vp->hdr_in && !vp->hdr_out && !vpstate->hdr_in) {
 			dly = win->dly[VOP2_DLY_MODE_HISO_S];
-		else if (vp->hdr_in && vp->hdr_out && vpstate->hdr_in)
+			dly += vp->bg_ovl_dly;
+		} else if (vp->hdr_in && vp->hdr_out && vpstate->hdr_in) {
 			dly = win->dly[VOP2_DLY_MODE_HIHO_H];
-		else
+			dly -= vp->bg_ovl_dly;
+		} else {
 			dly = win->dly[VOP2_DLY_MODE_DEFAULT];
+		}
 		if (vop2_cluster_window(win))
 			dly |= dly << 8;
 
@@ -6065,6 +6124,7 @@ static int vop2_create_crtc(struct vop2 *vop2)
 	const struct vop2_video_port_data *vp_data;
 	uint32_t possible_crtcs;
 	uint64_t soc_id;
+	uint32_t registered_num_crtcs = 0;
 	char dclk_name[9];
 	int i = 0, j = 0, k = 0;
 	int ret = 0;
@@ -6218,6 +6278,7 @@ static int vop2_create_crtc(struct vop2 *vop2)
 		drm_object_attach_property(&crtc->base,
 					   drm_dev->mode_config.tv_bottom_margin_property, 100);
 		vop2_crtc_create_plane_mask_property(vop2, crtc);
+		registered_num_crtcs++;
 	}
 
 	/*
@@ -6247,6 +6308,11 @@ static int vop2_create_crtc(struct vop2 *vop2)
 		win = &vop2->win[j];
 
 		if (win->type != DRM_PLANE_TYPE_OVERLAY)
+			continue;
+		/*
+		 * Only dual display(which need two crtcs) need mirror win
+		 */
+		if (registered_num_crtcs < 2 && vop2_is_mirror_win(win))
 			continue;
 
 		ret = vop2_plane_init(vop2, win, possible_crtcs);
@@ -6326,6 +6392,7 @@ static int vop2_win_init(struct vop2 *vop2)
 			area->regs = regs;
 			area->type = DRM_PLANE_TYPE_OVERLAY;
 			area->formats = win->formats;
+			area->feature = win->feature;
 			area->nformats = win->nformats;
 			area->format_modifiers = win->format_modifiers;
 			area->max_upscale_factor = win_data->max_upscale_factor;

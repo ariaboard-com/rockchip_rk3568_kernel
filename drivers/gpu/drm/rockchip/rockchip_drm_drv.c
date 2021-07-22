@@ -116,15 +116,18 @@ EXPORT_SYMBOL(rockchip_drm_unregister_sub_dev);
 struct rockchip_drm_sub_dev *rockchip_drm_get_sub_dev(struct device_node *node)
 {
 	struct rockchip_drm_sub_dev *sub_dev = NULL;
+	bool found = false;
 
 	mutex_lock(&rockchip_drm_sub_dev_lock);
 	list_for_each_entry(sub_dev, &rockchip_drm_sub_dev_list, list) {
-		if (sub_dev->of_node == node)
+		if (sub_dev->of_node == node) {
+			found = true;
 			break;
+		}
 	}
 	mutex_unlock(&rockchip_drm_sub_dev_lock);
 
-	return sub_dev;
+	return found ? sub_dev : NULL;
 }
 EXPORT_SYMBOL(rockchip_drm_get_sub_dev);
 
@@ -167,6 +170,10 @@ static const struct drm_display_mode rockchip_drm_default_modes[] = {
 		   1760, 1980, 0, 720, 725, 730, 750, 0,
 		   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC),
 	  .vrefresh = 50, .picture_aspect_ratio = HDMI_PICTURE_ASPECT_16_9, },
+	/* 0x10 - 1024x768@60Hz */
+	{ DRM_MODE("1024x768", DRM_MODE_TYPE_DRIVER, 65000, 1024, 1048,
+		   1184, 1344, 0,  768, 771, 777, 806, 0,
+		   DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC) },
 	/* 17 - 720x576@50Hz 4:3 */
 	{ DRM_MODE("720x576", DRM_MODE_TYPE_DRIVER, 27000, 720, 732,
 		   796, 864, 0, 576, 581, 586, 625, 0,
@@ -1016,8 +1023,15 @@ static void show_loader_logo(struct drm_device *drm_dev)
 			struct rockchip_drm_private *priv =
 							drm_dev->dev_private;
 
-			if (unset->hdisplay && unset->vdisplay)
+			if (unset->hdisplay && unset->vdisplay) {
+				if (priv->crtc_funcs[pipe] &&
+				    priv->crtc_funcs[pipe]->loader_protect)
+					priv->crtc_funcs[pipe]->loader_protect(crtc, true);
 				priv->crtc_funcs[pipe]->crtc_close(crtc);
+				if (priv->crtc_funcs[pipe] &&
+				    priv->crtc_funcs[pipe]->loader_protect)
+					priv->crtc_funcs[pipe]->loader_protect(crtc, false);
+			}
 		}
 
 		list_del(&unset->head);

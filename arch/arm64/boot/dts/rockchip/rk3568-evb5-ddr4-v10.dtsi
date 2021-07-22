@@ -142,30 +142,8 @@
 	};
 };
 
-&dmc {
-	system-status-freq = <
-		/*system status         freq(KHz)*/
-		SYS_STATUS_NORMAL       780000
-		SYS_STATUS_REBOOT       1056000
-		SYS_STATUS_SUSPEND      324000
-		SYS_STATUS_VIDEO_4K     780000
-		SYS_STATUS_VIDEO_4K_10B 780000
-		SYS_STATUS_BOOST        1056000
-		SYS_STATUS_ISP          1056000
-		SYS_STATUS_PERFORMANCE  1056000
-	>;
-};
-
-&dmc_opp_table {
-	opp-1056000000 {
-		opp-hz = /bits/ 64 <1056000000>;
-		opp-microvolt = <900000>;
-	};
-	/delete-node/ opp-1560000000;
-};
-
 /*
- * mipi_dphy0 needs to be enabled
+ * video_phy0 needs to be enabled
  * when dsi0 is enabled
  */
 &dsi0 {
@@ -185,7 +163,7 @@
 };
 
 /*
- * mipi_dphy1 needs to be enabled
+ * video_phy1 needs to be enabled
  * when dsi1 is enabled
  */
 &dsi1 {
@@ -397,11 +375,11 @@
 	};
 };
 
-&mipi_dphy0 {
+&video_phy0 {
 	status = "okay";
 };
 
-&mipi_dphy1 {
+&video_phy1 {
 	status = "disabled";
 };
 
