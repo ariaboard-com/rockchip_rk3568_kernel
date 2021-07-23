@@ -86,26 +86,33 @@
 		regulator-always-on;
 	};
 
-    firefly_leds: leds {
-       compatible = "gpio-leds";
-       power_led: power {
-           label = "firefly:blue:power";
-           linux,default-trigger = "ir-power-click";
-           default-state = "on";
-           gpios = <&gpio4 RK_PB6 GPIO_ACTIVE_HIGH>;
-           pinctrl-names = "default";
-           pinctrl-0 = <&led_power>;
-       };
+	firefly_leds: leds {
+		compatible = "gpio-leds";
+		power_led: power {
+			label = "firefly:blue:power";
+			linux,default-trigger = "ir-power-click";
+			default-state = "on";
+			gpios = <&gpio4 RK_PB6 GPIO_ACTIVE_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&led_power>;
+		};
 
-       user_led: user {
-           label = "firefly:yellow:user";
-           linux,default-trigger = "ir-user-click";
-           default-state = "off";
-           gpios = <&gpio4 RK_PB0 GPIO_ACTIVE_HIGH>;
-           pinctrl-names = "default";
-           pinctrl-0 = <&led_user>;
-       };
-   };
+		user_led: user {
+			label = "firefly:yellow:user";
+			linux,default-trigger = "ir-user-click";
+			default-state = "off";
+			gpios = <&gpio4 RK_PB0 GPIO_ACTIVE_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&led_user>;
+		};
+
+		fan_ctl: fan-ctl {
+			label = "firefly:fan_ctl:user";
+			linux,default-trigger = "ir-user-click";
+			default-state = "on";
+			gpios = <&gpio4 RK_PA1 GPIO_ACTIVE_HIGH>;
+		};
+	};
 };
 
 /* sdcard config
