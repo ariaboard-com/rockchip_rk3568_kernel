@@ -177,6 +177,12 @@
     status = "okay";
 };
 
+&rk809 {
+	rtc {
+		status = "disabled";
+	};
+};
+
 &rk809_codec {
     hp-ctl-gpios = <&gpio3 RK_PD0 GPIO_ACTIVE_HIGH>;
     spk-ctl-gpios = <&gpio1 RK_PA4 GPIO_ACTIVE_HIGH>;
@@ -216,6 +222,7 @@
 	pinctrl-0 = <&uart9m1_xfer>;
 };
 
+/delete-node/ &pcie30_3v3;
 /* pcie multiplex with sata2 */
 &pcie2x1 {
     reset-gpios = <&gpio1 RK_PB2 GPIO_ACTIVE_HIGH>;
@@ -343,7 +350,7 @@
 
 &i2c4 {
     status = "okay";
-   // pinctrl-0 = <&i2c2m1_xfer>;
+
     XC7022b: XC7022b@1b{
         status = "okay";
         compatible = "firefly,xc7022";
@@ -369,6 +376,20 @@
             };
         };
     };
+};
+
+/delete-node/ &hym8563;
+&i2c2 {
+	status = "okay";
+
+	hym8563: hym8563@51 {
+		status = "okay";
+		compatible = "haoyu,hym8563";
+		reg = <0x51>;
+		#clock-cells = <0>;
+		rtc-irq-gpio = <&gpio0 RK_PD4 IRQ_TYPE_EDGE_FALLING>;
+		clock-frequency = <32768>;
+	};
 };
 
 &csi2_dphy_hw {
