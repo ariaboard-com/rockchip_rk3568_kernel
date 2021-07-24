@@ -355,8 +355,19 @@
      status = "disabled";
  };
 
+/delete-node/ &mc3230;
 &i2c4 {
     status = "okay";
+
+	mc3230: mc3230sensor@4c {
+		compatible = "gs_mc3230";
+		reg = <0x4c>;
+		type = <SENSOR_TYPE_ACCEL>;
+		irq_enable = <0>;
+		poll_delay_ms = <30>;
+		layout = <4>;
+		status = "okay";
+	};
 
     XC7022b: XC7022b@1b{
         status = "okay";
