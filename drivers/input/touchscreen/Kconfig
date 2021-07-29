@@ -1409,6 +1409,14 @@ config TOUCHSCREEN_FT5436
 	  Say Y here if you have Focaltech touch panel.
 	  If unsure, say N.
 
+config TOUCHSCREEN_HX83102
+    bool "HIMAX HX83102"
+    depends on I2C
+    default n
+    help
+        Say Y here if you have Himax touch panel.
+        If unsure, say N.
+
 source "drivers/input/touchscreen/cyttsp5/Kconfig"
 
 endif
