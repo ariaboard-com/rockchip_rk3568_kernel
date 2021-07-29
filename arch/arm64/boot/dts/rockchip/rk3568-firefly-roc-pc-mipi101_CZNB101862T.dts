@@ -456,7 +456,7 @@
 	connect = <&vp1_out_dsi1>;
 };
 
-&mipi_dphy1 {
+&video_phy1 {
 	status = "okay";
 };
 
