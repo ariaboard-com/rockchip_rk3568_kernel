@@ -193,7 +193,7 @@
 &rk809_codec {
     hp-ctl-gpios = <&gpio3 RK_PD0 GPIO_ACTIVE_HIGH>;
     spk-ctl-gpios = <&gpio1 RK_PA4 GPIO_ACTIVE_HIGH>;
-    io-channels = <&saradc 3>;
+    io-channels = <&saradc 2>;
     hp-det-adc-value = <941>;
     hp_adc_drift_scope = <20>;
     board-spk-from-hp;
