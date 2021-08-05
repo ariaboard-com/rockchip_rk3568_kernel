@@ -48,6 +48,14 @@
         regulator-always-on;
     };
 
+    vcc_cam_power: vcc-cam-power-regulator {
+        compatible = "regulator-fixed";
+		enable-active-high;
+		gpios = <&pca9554 PCA_IO0_1 GPIO_ACTIVE_HIGH>;
+        regulator-name = "vcc_cam_power_en";
+        regulator-always-on;
+    };
+
 	firefly_leds: leds {
 		status = "okay";
 		compatible = "gpio-leds";
@@ -74,11 +82,31 @@
 			default-state = "on";
 			gpios = <&pca9555 PCA_IO1_0 GPIO_ACTIVE_HIGH>;
 		};
+
+		cam_ir_led: cam-ir-led {
+			label = "firefly:cam_ir:user";
+			linux,default-trigger = "ir-user-click";
+			default-state = "off";
+			gpios = <&pca9554 PCA_IO0_0 GPIO_ACTIVE_HIGH>;
+		};
+
     };
+
+	pwm_leds: pwm-leds{
+		status = "okay";
+		compatible = "pwm-leds";
+
+		cam_rgb_led: cam-rgb-led {
+			label = "PWM-RGB";
+			pwms = <&pwm11 0 25000 0>;
+			max-brightness = <255>;
+			init-brightness = <0>;
+		};
+	};
 };
 
 &csi2_dphy0 {
-	status = "okay";
+	status = "disabled";
 
 	ports {
 		#address-cells = <1>;
@@ -112,6 +140,106 @@
 	};
 };
 
+&csi2_dphy1 {
+	status = "okay";
+	/*
+	* dphy1 only used for split mode,
+	* can be used  concurrently  with dphy2
+	* full mode and split mode are mutually exclusive
+	*/
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dphy1_in: endpoint@1 {
+					reg = <1>;
+					remote-endpoint = <&gc2053_out>;
+					data-lanes = <1 2>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dphy1_out: endpoint@1 {
+					reg = <1>;
+					remote-endpoint = <&isp0_in>;
+			};
+		};
+	};
+};
+
+&csi2_dphy2 {
+	status = "okay";
+	/*
+	* dphy2 only used for split mode,
+	* can be used  concurrently  with dphy1
+	* full mode and split mode are mutually exclusive
+	*/
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dphy2_in: endpoint@1 {
+					reg = <1>;
+					remote-endpoint = <&gc2093_out>;
+					data-lanes = <1 2>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dphy2_out: endpoint@1 {
+					reg = <1>;
+					remote-endpoint = <&isp1_in>;
+			};
+		};
+	};
+};
+
+&rkisp_vir0 {
+	status = "okay";
+
+	port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		isp0_in: endpoint@0 {
+			reg = <0>;
+			remote-endpoint = <&dphy1_out>;
+		};
+	};
+};
+
+&rkisp_vir1 {
+	status = "okay";
+
+	port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		isp1_in: endpoint@0 {
+			reg = <0>;
+			remote-endpoint = <&dphy2_out>;
+		};
+	};
+};
+
 &i2c1 {
     status = "okay";
 };
@@ -119,7 +247,7 @@
 &i2c4 {
 	status = "okay";
 	XC7022b: XC7022b@1b {
-		 status = "okay";
+		 status = "disabled";
 		 compatible = "firefly,xc7022";
 		 reg = <0x1b>;
 		 clocks = <&cru CLK_CIF_OUT>;
@@ -169,7 +297,67 @@
 				 data-lanes = <1 2>;
 			 };
 		 };
-	 };
+	};
+
+	gc2053: gc2053@37 { //IR
+		status = "okay";
+		compatible = "galaxycore,gc2053";
+		reg = <0x37>;
+
+		power-domains = <&power RK3568_PD_VI>;
+		clocks = <&pmucru CLK_WIFI>;
+		clock-names = "xvclk";
+		pinctrl-names = "default";
+		pinctrl-0 = <&refclk_pins>;
+
+		reset-gpios = <&pca9555 PCA_IO0_3 GPIO_ACTIVE_LOW>;
+		pwdn-gpios = <&pca9555 PCA_IO0_4 GPIO_ACTIVE_LOW>;
+
+		rockchip,camera-module-index = <0>;
+		rockchip,camera-module-facing = "back";
+		rockchip,camera-module-name = "YT-RV1109-2-V1";
+		rockchip,camera-module-lens-name = "40IR-2MP-F20";
+		port {
+			gc2053_out: endpoint {
+			remote-endpoint = <&dphy1_in>;
+			data-lanes = <1 2>;
+			};
+		};
+	};
+
+	gc2093: gc2093b@7e{ //RGB
+		status = "okay";
+		compatible = "galaxycore,gc2093";
+		reg = <0x7e>;
+
+		power-domains = <&power RK3568_PD_VI>;
+		clocks = <&cru CLK_CIF_OUT>;
+		clock-names = "xvclk";
+
+		reset-gpios = <&pca9555 PCA_IO0_0 GPIO_ACTIVE_LOW>;
+		pwdn-gpios = <&pca9555 PCA_IO0_1 GPIO_ACTIVE_HIGH>;
+
+		firefly,clkout-enabled-index = <0>;
+		rockchip,camera-module-index = <1>;
+		rockchip,camera-module-facing = "front";
+		rockchip,camera-module-name = "YT-RV1109-2-V1";
+		rockchip,camera-module-lens-name = "40IR-2MP-F20";
+		port {
+			gc2093_out: endpoint {
+			remote-endpoint = <&dphy2_in>;
+			data-lanes = <1 2>;
+			};
+		};
+	};
+
+	pca9554: gpio@20 {
+		status = "okay";
+		compatible = "nxp,pca9554";
+		reg = <0x20>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		gpio-group-num = <500>;
+	};
 };
 
 &pca9555 {
@@ -285,6 +473,11 @@
 
 &pwm7 {
 	status = "okay";
+};
+
+&pwm11 {
+	status = "okay";
+	pinctrl-0 = <&pwm11m1_pins>;
 };
 
 &sata2 {
