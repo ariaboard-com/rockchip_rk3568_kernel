@@ -82,15 +82,7 @@
 			default-state = "on";
 			gpios = <&pca9555 PCA_IO1_0 GPIO_ACTIVE_HIGH>;
 		};
-
-		cam_ir_led: cam-ir-led {
-			label = "firefly:cam_ir:user";
-			linux,default-trigger = "ir-user-click";
-			default-state = "off";
-			gpios = <&pca9554 PCA_IO0_0 GPIO_ACTIVE_HIGH>;
-		};
-
-    };
+	};
 
 	pwm_leds: pwm-leds{
 		status = "okay";
@@ -101,6 +93,18 @@
 			pwms = <&pwm11 0 25000 0>;
 			max-brightness = <255>;
 			init-brightness = <0>;
+		};
+	};
+
+	cam_leds: cam-leds {
+		status = "okay";
+		compatible = "gpio-leds";
+
+		cam_ir_led: cam-ir-led {
+			label = "firefly:cam_ir:user";
+			linux,default-trigger = "ir-user-click";
+			default-state = "off";
+			gpios = <&pca9554 PCA_IO0_0 GPIO_ACTIVE_HIGH>;
 		};
 	};
 };
