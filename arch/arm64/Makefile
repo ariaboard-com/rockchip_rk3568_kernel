@@ -150,7 +150,7 @@ dtbs: prepare scripts
 	$(Q)$(MAKE) $(build)=$(boot)/dts
 
 dtbs_install:
-	$(Q)$(MAKE) $(dtbinst)=$(boot)/dts
+	$(Q)$(MAKE) $(dtbinst)=$(boot)/dts/rockchip
 
 PHONY += vdso_install
 vdso_install:
