@@ -653,9 +653,11 @@ ssize_t goodix_tool_write(struct file *filp, const char __user *buff, size_t len
             rqst_hotknot_state, wait_hotknot_timeout, wait_hotknot_state);
         got_hotknot_state &= (~rqst_hotknot_state);
         //got_hotknot_extra_state = 0;
+	set_current_state(TASK_INTERRUPTIBLE);
+
         switch(rqst_hotknot_state)
         {
-            set_current_state(TASK_INTERRUPTIBLE);
+            
             case HN_DEVICE_PAIRED:
                 hotknot_paired_flag = 0;
                 wait_event_interruptible(bp_waiter, force_wake_flag || 
@@ -703,6 +705,8 @@ ssize_t goodix_tool_write(struct file *filp, const char __user *buff, size_t len
             break;
         }
         force_wake_flag = 0;
+
+	set_current_state(TASK_RUNNING);
     }
     else if(23 == cmd_head1.wr)
     {
@@ -1049,9 +1053,10 @@ static ssize_t hotknot_write(struct file *filp, const char __user *buff, size_t 
             rqst_hotknot_state, wait_hotknot_timeout, wait_hotknot_state);
         got_hotknot_state &= (~rqst_hotknot_state);
         //got_hotknot_extra_state = 0;
+
+	set_current_state(TASK_INTERRUPTIBLE);
         switch(rqst_hotknot_state)
-        {
-            set_current_state(TASK_INTERRUPTIBLE);
+        {            
             case HN_DEVICE_PAIRED:
                 hotknot_paired_flag = 0;
                 wait_event_interruptible(bp_waiter, force_wake_flag || 
@@ -1099,6 +1104,8 @@ static ssize_t hotknot_write(struct file *filp, const char __user *buff, size_t 
             break;
         }
         force_wake_flag = 0;
+
+	set_current_state(TASK_RUNNING);
     }
     else if(23 == cmd_head2.wr)
     {

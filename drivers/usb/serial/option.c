@@ -2079,6 +2079,8 @@ static const struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(0x2C7C, 0x0455) }, /* Quectel AG550R */
 	{ USB_DEVICE(0x2C7C, 0x0620) }, /* Quectel EG20 */
 	{ USB_DEVICE(0x2C7C, 0x0800) }, /* Quectel RG500Q/RM500Q/RG510Q/RM510Q */
+
+	{ USB_DEVICE_AND_INTERFACE_INFO(0x2C7C, 0x0900, 0xff, 0x00, 0x00) }, /* Quectel RM500U-CN */
 #endif
 	{ } /* Terminating entry */
 };
@@ -2163,12 +2165,14 @@ static int option_probe(struct usb_serial *serial,
 #if 1 //Added by Quectel
 	//Quectel modules’s interface 4 can be used as USB network device
 	if (serial->dev->descriptor.idVendor == cpu_to_le16(0x2C7C)) {
+		__u16 idProduct = le16_to_cpu(serial->dev->descriptor.idProduct);
+
 		//some interfaces can be used as USB Network device (ecm, rndis, mbim)
 		if (serial->interface->cur_altsetting->desc.bInterfaceClass != 0xFF) {
 			return -ENODEV;
 		}
 		//interface 4 can be used as USB Network device (qmi)
-		else if (serial->interface->cur_altsetting->desc.bInterfaceNumber >= 4) {
+		else if ((idProduct != 0x6026 && idProduct != 0x6120 && idProduct != 0x900) && serial->interface->cur_altsetting->desc.bInterfaceNumber >= 4) {
 			return -ENODEV;
 		}
 	}

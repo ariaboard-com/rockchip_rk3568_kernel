@@ -469,6 +469,7 @@
 		clock-output-names = "xin24m";
 	};
 
+/*
 	xin32k: xin32k {
 		compatible = "fixed-clock";
 		clock-frequency = <32768>;
@@ -477,6 +478,7 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&clk32k_out0>;
 	};
+*/
 
 	scmi_shmem: scmi-shmem@10f000 {
 		compatible = "arm,scmi-shmem";
@@ -1818,7 +1820,7 @@
 		rockchip,grf = <&grf>;
 		#sound-dai-cells = <0>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&hdmitx_scl &hdmitx_sda &hdmitxm0_cec>;
+		pinctrl-0 = <&hdmitx_scl &hdmitx_sda>;
 		status = "disabled";
 
 		ports {

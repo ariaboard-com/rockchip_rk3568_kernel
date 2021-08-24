@@ -1299,7 +1299,7 @@ static int rk_pcie_really_probe(void *p)
 
 	ret = rk_pcie_phy_init(rk_pcie);
 	if (ret) {
-		dev_err(dev, "phy init failed\n");
+		dev_err(dev, "phy init failed: %d\n", ret);
 		goto disable_vpcie3v3;
 	}
 

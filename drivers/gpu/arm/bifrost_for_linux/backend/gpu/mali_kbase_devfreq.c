@@ -337,6 +337,7 @@ static struct devfreq_cooling_power kbase_cooling_power = {
 
 int kbase_devfreq_init(struct kbase_device *kbdev)
 {
+	struct devfreq_cooling_power *kbase_dcp = &kbase_cooling_power;
 	struct device_node *np = kbdev->dev->of_node;
 	struct devfreq_dev_profile *dp;
 	struct dev_pm_opp *opp;
