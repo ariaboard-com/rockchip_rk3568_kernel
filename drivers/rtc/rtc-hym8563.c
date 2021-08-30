@@ -248,18 +248,10 @@ static int hym8563_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
 	 * reboot -p
 	 */
 	if (alm_tm->tm_sec) {
-		alm_tm->tm_sec = 0;
-		alm_tm->tm_min++;
-		if (alm_tm->tm_min >= 60) {
-			alm_tm->tm_min = 0;
-			alm_tm->tm_hour++;
-			if (alm_tm->tm_hour >= 24) {
-				alm_tm->tm_hour = 0;
-				alm_tm->tm_mday++;
-				if (alm_tm->tm_mday > 31)
-					alm_tm->tm_mday = 0;
-			}
-		}
+		time64_t alarm_time = rtc_tm_to_time64(alm_tm);
+
+		alarm_time += 60 - alm_tm->tm_sec;
+		rtc_time64_to_tm(alarm_time, alm_tm);
 	}
 
 	ret = i2c_smbus_read_byte_data(client, HYM8563_CTL2);
