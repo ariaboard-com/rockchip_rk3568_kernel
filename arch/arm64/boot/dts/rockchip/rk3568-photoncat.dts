@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2020 Rockchip Electronics Co., Ltd.
+ *
+ */
+
+/dts-v1/;
+
+#include "rk3568-photoncat.dtsi"
+#include "rk3568-linux.dtsi"
+
+/ {
+	model = "Rockchip RK3568 PhotonCat Linux Board";
+	compatible = "rockchip,rk3568-photoncat", "rockchip,rk3568";
+};
