@@ -2060,14 +2060,14 @@
 		system-status-freq = <
 			/*system status         freq(KHz)*/
 			SYS_STATUS_NORMAL       780000
-			SYS_STATUS_REBOOT       1560000
+			SYS_STATUS_REBOOT       1332000
 			SYS_STATUS_SUSPEND      324000
 			SYS_STATUS_VIDEO_4K     780000
 			SYS_STATUS_VIDEO_4K_10B 780000
-			SYS_STATUS_BOOST        1560000
-			SYS_STATUS_ISP          1560000
-			SYS_STATUS_PERFORMANCE  1560000
-			SYS_STATUS_DUALVIEW     1560000
+			SYS_STATUS_BOOST        1332000
+			SYS_STATUS_ISP          1332000
+			SYS_STATUS_PERFORMANCE  1332000
+			SYS_STATUS_DUALVIEW     1332000
 		>;
 		auto-min-freq = <324000>;
 		auto-freq-en = <1>;
@@ -2102,8 +2102,8 @@
 			opp-microvolt = <900000>;
 			status = "disabled";
 		};
-		opp-1560000000 {
-			opp-hz = /bits/ 64 <1560000000>;
+		opp-1332000000 {
+			opp-hz = /bits/ 64 <1332000000>;
 			opp-microvolt = <900000>;
 		};
 	};
