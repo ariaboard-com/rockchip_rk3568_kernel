@@ -228,7 +228,7 @@
 
 	vdd_cpu: tcs4525@1c {
 		compatible = "tcs,tcs452x";
-        vsel-gpios = <&gpio0 RK_PA2 GPIO_ACTIVE_HIGH>;
+		vsel-gpios = <&gpio0 RK_PA2 GPIO_ACTIVE_HIGH>;
 		reg = <0x1c>;
 		vin-supply = <&vcc5v0_sys>;
 		regulator-compatible = "fan53555-reg";
