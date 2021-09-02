@@ -53,21 +53,21 @@
 		compatible = "gpio-leds";
 
 		power_led: power {
-			label = "firefly:red:power";
+			label = "firefly:blue:power";
 			linux,default-trigger = "ir-power-click";
 			default-state = "on";
-			gpios = <&gpio1 RK_PB1 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpio1 RK_PB2 GPIO_ACTIVE_HIGH>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&led_power>;
 		};
 
-		user_led: diy {
-			label = "firefly:blue:diy";
-			linux,default-trigger = "ir-diy1-click";
+		user_led: user {
+			label = "firefly:yellow:user";
+			linux,default-trigger = "ir-user-click";
 			default-state = "off";
-			gpios = <&gpio1 RK_PB2 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpio1 RK_PB1 GPIO_ACTIVE_HIGH>;
 			pinctrl-names = "default";
-			pinctrl-0 = <&led_diy>;
+			pinctrl-0 = <&led_user>;
 		};
 
 
@@ -359,11 +359,11 @@
 
 	leds {
 	    led_power: led-power {
-			rockchip,pins = <1 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <1 RK_PB2 RK_FUNC_GPIO &pcfg_pull_none>;
 	    };
 
-	    led_diy: led-diy {
-			rockchip,pins = <1 RK_PB2 RK_FUNC_GPIO &pcfg_pull_none>;
+	    led_user: led-user {
+			rockchip,pins = <1 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
 	    };
 	};
 };
