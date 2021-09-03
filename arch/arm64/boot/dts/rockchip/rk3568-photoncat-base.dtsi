@@ -135,7 +135,7 @@
 		regulator-min-microvolt = <800000>;
 		regulator-max-microvolt = <1200000>;
 		/* regulator-init-microvolt = <900000>; */
-		regulator-init-microvolt = <800000>;
+		regulator-init-microvolt = <900000>;
 		regulator-always-on;
 		regulator-boot-on;
 		regulator-settling-time-up-us = <250>;
