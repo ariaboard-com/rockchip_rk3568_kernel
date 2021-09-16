@@ -94,6 +94,7 @@
 };
 
 &sdmmc0 {
+/*
 	max-frequency = <150000000>;
 	supports-sd;
 	bus-width = <4>;
@@ -107,6 +108,28 @@
 	pinctrl-0 = <&sdmmc0_bus4 &sdmmc0_clk &sdmmc0_cmd &sdmmc0_det1>;
 	cd-gpios = <&gpio0 RK_PB5 GPIO_ACTIVE_LOW>;
 	status = "okay";
+*/
+
+	max-frequency = <150000000>;
+	supports-sdio;
+	bus-width = <4>;
+	cap-sd-highspeed;
+	cap-sdio-irq;
+	disable-wp;
+	sd-uhs-sdr104;
+	vmmc-supply = <&vcc_3v3>;
+	vqmmc-supply = <&vcc_3v3>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdmmc0_bus4 &sdmmc0_clk &sdmmc0_cmd>;
+	non-removable;
+	status = "okay";
+	
+	ath10k: wifi@0 {
+		reg = <0>;
+		compatible = "qcom,ath10k";
+                status = "okay";
+	};
+
 };
 
 &combphy0_us {
@@ -351,7 +374,8 @@
 &gpio0 {
         sd-pwren {
                 gpio-hog;
-                gpios = <RK_PB6 GPIO_ACTIVE_LOW>;
+                /* gpios = <RK_PB6 GPIO_ACTIVE_LOW>; */
+                gpios = <RK_PB6 GPIO_ACTIVE_HIGH>;
                 output-high;
                 line-name = "sd-pwren";
         };

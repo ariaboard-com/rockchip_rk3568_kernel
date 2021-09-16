@@ -124,13 +124,17 @@ int nf_conntrack_eventmask_report(unsigned int eventmask, struct nf_conn *ct,
 {
 	int ret = 0;
 	struct net *net = nf_ct_net(ct);
+#ifndef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
 	struct nf_ct_event_notifier *notify;
+#endif
 	struct nf_conntrack_ecache *e;
 
 	rcu_read_lock();
+#ifndef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
 	notify = rcu_dereference(net->ct.nf_conntrack_event_cb);
 	if (!notify)
 		goto out_unlock;
+#endif
 
 	e = nf_ct_ecache_find(ct);
 	if (!e)
@@ -148,7 +152,12 @@ int nf_conntrack_eventmask_report(unsigned int eventmask, struct nf_conn *ct,
 		if (!((eventmask | missed) & e->ctmask))
 			goto out_unlock;
 
+#ifdef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
+		ret = atomic_notifier_call_chain(&net->ct.nf_conntrack_chain,
+			eventmask | missed, &item);
+#else
 		ret = notify->fcn(eventmask | missed, &item);
+#endif
 		if (unlikely(ret < 0 || missed)) {
 			spin_lock_bh(&ct->lock);
 			if (ret < 0) {
@@ -181,15 +190,19 @@ void nf_ct_deliver_cached_events(struct nf_conn *ct)
 {
 	struct net *net = nf_ct_net(ct);
 	unsigned long events, missed;
+#ifndef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
 	struct nf_ct_event_notifier *notify;
+#endif
 	struct nf_conntrack_ecache *e;
 	struct nf_ct_event item;
 	int ret;
 
 	rcu_read_lock();
+#ifndef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
 	notify = rcu_dereference(net->ct.nf_conntrack_event_cb);
 	if (notify == NULL)
 		goto out_unlock;
+#endif
 
 	e = nf_ct_ecache_find(ct);
 	if (e == NULL)
@@ -212,7 +225,13 @@ void nf_ct_deliver_cached_events(struct nf_conn *ct)
 	item.portid = 0;
 	item.report = 0;
 
+#ifdef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
+	ret = atomic_notifier_call_chain(&net->ct.nf_conntrack_chain,
+			events | missed,
+			&item);
+#else
 	ret = notify->fcn(events | missed, &item);
+#endif
 
 	if (likely(ret == 0 && !missed))
 		goto out_unlock;

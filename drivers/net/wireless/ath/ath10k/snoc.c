@@ -1190,7 +1190,7 @@ static int ath10k_wcn3990_clk_init(struct ath10k *ar)
 	return 0;
 
 err_clock_config:
-	for (i = i - 1; i >= 0; i--) {
+	for (; i >= 0; i--) {
 		clk_info = &ar_snoc->clk[i];
 
 		if (!clk_info->handle)
@@ -1274,6 +1274,7 @@ static int ath10k_snoc_probe(struct platform_device *pdev)
 	struct ath10k *ar;
 	int ret;
 	u32 i;
+	struct ath10k_bus_params bus_params;
 
 	of_id = of_match_device(ath10k_snoc_dt_match, &pdev->dev);
 	if (!of_id) {
@@ -1341,7 +1342,9 @@ static int ath10k_snoc_probe(struct platform_device *pdev)
 		goto err_free_irq;
 	}
 
-	ret = ath10k_core_register(ar, drv_data->hw_rev);
+	bus_params.dev_type = ATH10K_DEV_TYPE_LL;
+	bus_params.chip_id = drv_data->hw_rev;
+	ret = ath10k_core_register(ar, &bus_params);
 	if (ret) {
 		ath10k_err(ar, "failed to register driver core: %d\n", ret);
 		goto err_hw_power_off;
