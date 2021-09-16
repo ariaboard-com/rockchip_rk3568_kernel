@@ -770,7 +770,7 @@ static struct nf_ct_event_notifier sfe_cm_conntrack_notifier = {
  */
 static struct nf_hook_ops sfe_cm_ops_post_routing[] __read_mostly = {
 	SFE_IPV4_NF_POST_ROUTING_HOOK(__sfe_cm_ipv4_post_routing_hook),
-#ifdef SFE_SUPPORT_IPV6
+#ifdef CONFIG_SFE_SUPPORT_IPV6
 	SFE_IPV6_NF_POST_ROUTING_HOOK(__sfe_cm_ipv6_post_routing_hook),
 #endif
 };

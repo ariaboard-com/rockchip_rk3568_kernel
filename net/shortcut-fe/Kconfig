@@ -12,3 +12,7 @@ config SHORTCUT_FE
 	  called shortcut-fe.
 
 	  If unsure, say N.
+
+config SFE_SUPPORT_IPV6
+	bool "IPv6 support for SFE"
+	depends on SHORTCUT_FE

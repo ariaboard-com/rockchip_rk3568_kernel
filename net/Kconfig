@@ -459,3 +459,4 @@ config HAVE_EBPF_JIT
 	bool
 
 source "net/shortcut-fe/Kconfig"
+source "net/fast-classifier/Kconfig"

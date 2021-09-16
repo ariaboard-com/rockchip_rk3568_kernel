@@ -175,7 +175,7 @@ void sfe_ipv4_register_sync_rule_callback(sfe_sync_rule_callback_t callback);
 void sfe_ipv4_update_rule(struct sfe_connection_create *sic);
 void sfe_ipv4_mark_rule(struct sfe_connection_mark *mark);
 
-#ifdef SFE_SUPPORT_IPV6
+#ifdef CONFIG_SFE_SUPPORT_IPV6
 /*
  * IPv6 APIs used by connection manager
  */
