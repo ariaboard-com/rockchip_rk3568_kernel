@@ -368,29 +368,6 @@
 		layout = <4>;
 		status = "okay";
 	};
-
-	os04a10: os04a10@36 {
-		status = "okay";
-		compatible = "ovti,os04a10";
-		reg = <0x36>;
-		clocks = <&cru CLK_CAM0_OUT>;
-		clock-names = "xvclk";
-		power-domains = <&power RK3568_PD_VI>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&cam_clkout0>;
-		reset-gpios = <&gpio3 RK_PD5 GPIO_ACTIVE_LOW>;
-		pwdn-gpios = <&gpio3 RK_PD4 GPIO_ACTIVE_HIGH>;
-		rockchip,camera-module-index = <0>;
-		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "CMK-OT1607-FV1";
-		rockchip,camera-module-lens-name = "M12-40IRC-4MP-F16";
-		port {
-			os04a10_out: endpoint {
-				remote-endpoint = <&dphy0_in>;
-				data-lanes = <1 2 3 4>;
-			};
-		};
-	};
 };
 
 /delete-node/ &hym8563;
@@ -406,50 +383,3 @@
 		clock-frequency = <32768>;
 	};
 };
-
-&csi2_dphy_hw {
-    status = "okay";
-};
-
-&isp0_in {
-	remote-endpoint = <&dphy0_out>;
-};
-
-&csi2_dphy0 {
-	status = "okay";
-
-	ports {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		port@0 {
-			reg = <0>;
-			#address-cells = <1>;
-			#size-cells = <0>;
-
-			dphy0_in: endpoint@1 {
-				reg = <1>;
-				remote-endpoint = <&os04a10_out>;
-				data-lanes = <1 2 3 4>;
-			};
-		};
-		port@1 {
-			reg = <1>;
-			#address-cells = <1>;
-			#size-cells = <0>;
-
-			dphy0_out: endpoint@0 {
-				reg = <0>;
-				remote-endpoint = <&isp0_in>;
-			};
-		};
-	};
-};
-
-&csi2_dphy2{
-    status = "disabled";
-};
-
-&csi2_dphy1 {
-    status = "disabled"; 
-};
-
