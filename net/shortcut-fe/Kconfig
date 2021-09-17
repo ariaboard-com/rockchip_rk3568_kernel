@@ -16,3 +16,14 @@ config SHORTCUT_FE
 config SFE_SUPPORT_IPV6
 	bool "IPv6 support for SFE"
 	depends on SHORTCUT_FE
+
+config SHORTCUT_FE_CM
+	tristate "Shortcut Forwarding Engine Connection Manager"
+	depends on SHORTCUT_FE
+	---help---
+	  Connection Manager for Shortcut Forwarding Engine.
+
+	  To compile this code as a module, choose M here: the module will be
+	  called shortcut-fe-cm.
+
+	  If unsure, say N.
