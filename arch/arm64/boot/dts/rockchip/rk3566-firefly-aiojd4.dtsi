@@ -383,3 +383,15 @@
 		clock-frequency = <32768>;
 	};
 };
+
+&csi2_dphy0 {
+	status = "disabled";
+};
+
+&csi2_dphy1 {
+	status = "disabled";
+};
+
+&csi2_dphy2 {
+	status = "disabled";
+};
