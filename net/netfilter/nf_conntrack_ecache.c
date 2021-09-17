@@ -20,6 +20,9 @@
 #include <linux/stddef.h>
 #include <linux/err.h>
 #include <linux/percpu.h>
+#ifdef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
+#include <linux/notifier.h>
+#endif
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
 #include <linux/slab.h>
@@ -278,6 +281,12 @@ out_unlock:
 	rcu_read_unlock();
 }
 
+#ifdef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
+int nf_conntrack_register_notifier(struct net *net, struct notifier_block *nb)
+{
+        return atomic_notifier_chain_register(&net->ct.nf_conntrack_chain, nb);
+}
+#else
 int nf_conntrack_register_notifier(struct net *net,
 				   struct nf_ct_event_notifier *new)
 {
@@ -298,8 +307,15 @@ out_unlock:
 	mutex_unlock(&nf_ct_ecache_mutex);
 	return ret;
 }
+#endif
 EXPORT_SYMBOL_GPL(nf_conntrack_register_notifier);
 
+#ifdef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
+int nf_conntrack_unregister_notifier(struct net *net, struct notifier_block *nb)
+{
+	return atomic_notifier_chain_unregister(&net->ct.nf_conntrack_chain, nb);
+}
+#else
 void nf_conntrack_unregister_notifier(struct net *net,
 				      struct nf_ct_event_notifier *new)
 {
@@ -313,6 +329,7 @@ void nf_conntrack_unregister_notifier(struct net *net,
 	mutex_unlock(&nf_ct_ecache_mutex);
 	/* synchronize_rcu() is called from ctnetlink_exit. */
 }
+#endif
 EXPORT_SYMBOL_GPL(nf_conntrack_unregister_notifier);
 
 int nf_ct_expect_register_notifier(struct net *net,
@@ -451,3 +468,15 @@ void nf_conntrack_ecache_fini(void)
 {
 	nf_ct_extend_unregister(&event_extend);
 }
+
+int nf_conntrack_register_chain_notifier(struct net *net, struct notifier_block *nb)
+{
+	return atomic_notifier_chain_register(&net->ct.nf_conntrack_chain, nb);
+}
+EXPORT_SYMBOL_GPL(nf_conntrack_register_chain_notifier);
+
+int nf_conntrack_unregister_chain_notifier(struct net *net, struct notifier_block *nb)
+{
+	return atomic_notifier_chain_unregister(&net->ct.nf_conntrack_chain, nb);
+}
+EXPORT_SYMBOL_GPL(nf_conntrack_unregister_chain_notifier);
