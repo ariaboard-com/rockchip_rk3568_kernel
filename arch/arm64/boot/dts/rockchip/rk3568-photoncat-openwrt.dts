@@ -14,6 +14,6 @@
 	compatible = "rockchip,rk3568-photoncat", "rockchip,rk3568";
 	
 	chosen: chosen {
-		bootargs = "earlycon=uart8250,mmio32,0xfe660000 console=ttyFIQ0 root=/dev/mmcblk0p6 rootfstype=ext4 rootwait coherent_pool=1m systemd.gpt_auto=0 cgroup_enable=memory swapaccount=1";
+		bootargs = "earlycon=uart8250,mmio32,0xfe660000 console=ttyFIQ0 root=/dev/mmcblk0p6 rootfstype=squashfs rootwait coherent_pool=1m systemd.gpt_auto=0 cgroup_enable=memory swapaccount=1";
 	};
 };

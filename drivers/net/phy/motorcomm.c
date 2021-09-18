@@ -340,6 +340,20 @@ static unsigned long autoneg_phydev[YT8521_NUM_OF_FIBER_PHY];
 static int autoneg_changed[YT8521_NUM_OF_FIBER_PHY];
 static int autoneg_actual_num_phy = 0;
 
+static int yt8521_led_init(struct phy_device *phydev)
+{
+	int ret;
+	unsigned int val;
+	
+	val = (0x7 << 4);
+	ret = ytphy_write_ext(phydev, YT8521_EXTREG_LED2_CFG, val);
+	
+	val = 0x7;
+	ret = ytphy_write_ext(phydev, YT8521_EXTREG_LED1_CFG, val);
+
+	return 0;
+}
+
 static int yt8521_config_init(struct phy_device *phydev)
 {
 	int ret;
@@ -395,6 +409,9 @@ static int yt8521_config_init(struct phy_device *phydev)
 	ret = ytphy_write_ext(phydev, 0xc, val);
 	if (ret < 0)
 		return ret;
+		
+	yt8521_led_init(phydev);
+		
 	printk (KERN_INFO "yzhang..8521 init call out...\n");
 	return ret;
 }
