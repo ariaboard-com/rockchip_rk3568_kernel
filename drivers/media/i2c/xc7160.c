@@ -166,7 +166,7 @@ static const struct xc7160_mode supported_modes[] = {
 		.exp_def = 0x000c,
 		.hts_def = 0x011E,
 		.vts_def = 0x20D0,
-		.reg_list = xc7160_1080p_t20210831_regs,
+		.reg_list = xc7160_1080p_t20210908_regs,
 	},
 
 		//driver setting
@@ -678,43 +678,6 @@ static int xc7160_check_isp_reg(struct xc7160 *xc7160)
 }
 #endif // DEBUG
 
-static int __xc7160_start_stream(struct xc7160 *xc7160)
-{
-	int ret;
-	struct device *dev = &xc7160->client->dev;
-	
-#ifdef FIREFLY_DEBUG
-		xc7160_check_isp_reg(xc7160);
-#endif // DEBUG
-
-	if(xc7160->isp_out_colorbar == true)
-		ret = xc7160_write_array(xc7160->client, xc7160_colorbar_on_regs);
-	else
-		ret = xc7160_write_array(xc7160->client, xc7160_stream_on_regs);
-	
-	if(ret)
-		dev_err(dev, "xc7160 write stream or colorbar regs failed\n");
-
-	/* In case these controls are set before streaming */
-	mutex_unlock(&xc7160->mutex);
-	ret = v4l2_ctrl_handler_setup(&xc7160->ctrl_handler);
-	mutex_lock(&xc7160->mutex);
-	if (ret)
-		return ret;
-
-	return 0;
-}
-
-static int __xc7160_stop_stream(struct xc7160 *xc7160)
-{	
-	int ret;
-
-	ret = xc7160_write_array(xc7160->client, xc7160_stream_off_regs);
-	if(ret)
-		printk("%s: write stream off failed\n",__func__);
-		
-	return ret;
-}
 
 static int xc7160_check_isp_id(struct xc7160 *xc7160,
 				   struct i2c_client *client)
@@ -769,11 +732,7 @@ static int sc8238_check_sensor_id(struct xc7160 *xc7160,
 			return ret;
 		}			
 		//dev_info(dev, "sensor chip is SC8238, id_L is 0x%02x\n",id);
-
 		dev_info(dev, "sensor chip is SC8238\n");
-		
-	}else{
-		dev_err(dev, "Unexpected sensor of SC8238_CHIP_ID_REG1, id(%06x), ret(%d)\n", id, ret);
 	}
 
 	ret = xc7160_write_array(client, xc7160_i2c_bypass_off_regs);
@@ -783,6 +742,73 @@ static int sc8238_check_sensor_id(struct xc7160 *xc7160,
 	}	
 
 	return 0;	
+}
+
+static int __xc7160_start_stream(struct xc7160 *xc7160)
+{
+	int ret;
+	struct device *dev = &xc7160->client->dev;
+
+	//driver setting
+	//xc7160_global_regs =xc7160_1080p_t20210831_regs;
+	ret = xc7160_write_array(xc7160->client, xc7160_global_regs);
+	if(ret){
+		dev_err(dev, "isp xc7160 initial failed\n");
+		goto lock_and_return;
+	}
+
+	xc7160->isp_out_colorbar = false;
+	ret=sc8238_check_sensor_id(xc7160, xc7160->client);
+	if (ret){
+		dev_err(dev, "check sensor sc8238 id failed, color bar mode may be output!!!\n");
+		xc7160->isp_out_colorbar = true;
+	}
+
+	if(xc7160->isp_out_colorbar == true){
+		ret = xc7160_write_array(xc7160->client, xc7160_colorbar_on_regs);
+	}else{
+	//driver setting
+	//sc8238_global_regs = sensor_30fps_t20210831_initial_regs;
+		ret = xc7160_write_array(xc7160->client, xc7160_i2c_bypass_on_regs);
+		if (ret)
+			dev_err(dev, "could not set bypass on registers\n");
+
+		ret = sc8238_write_array(xc7160->client, sc8238_global_regs);
+
+		xc7160_write_array(xc7160->client, xc7160_i2c_bypass_off_regs);
+		if (ret){
+			dev_err(dev, "failed to initialize sc8238 register\n");
+			ret = xc7160_write_array(xc7160->client, xc7160_colorbar_on_regs);
+		}
+	}
+
+	if(ret)
+		dev_err(dev, "xc7160 write stream or colorbar regs failed\n");
+
+#ifdef FIREFLY_DEBUG
+		xc7160_check_isp_reg(xc7160);
+#endif // DEBUG
+
+lock_and_return:
+	/* In case these controls are set before streaming */
+	mutex_unlock(&xc7160->mutex);
+	ret = v4l2_ctrl_handler_setup(&xc7160->ctrl_handler);
+	mutex_lock(&xc7160->mutex);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static int __xc7160_stop_stream(struct xc7160 *xc7160)
+{
+	int ret;
+
+	ret = xc7160_write_array(xc7160->client, xc7160_stream_off_regs);
+	if(ret)
+		printk("%s: write stream off failed\n",__func__);
+
+	return ret;
 }
 
 
@@ -811,60 +837,18 @@ static int xc7160_s_power(struct v4l2_subdev *sd, int on)
 		ret = __xc7160_power_on(xc7160);
 		if(ret){
 			dev_err(dev, "xc7160 power on failed\n");
+			goto unlock_and_return;
 		}
 		xc7160->power_on = true;
 
 		ret = xc7160_check_isp_id(xc7160,xc7160->client);
 		if (ret){
 			dev_err(dev, "write XC7160_REG_HIGH_SELECT failed\n");
+			pm_runtime_put_noidle(&client->dev);
 			goto unlock_and_return;
 		}
-		//driver setting
-		//xc7160_global_regs =xc7160_1080p_t20210831_regs;
-	
-		ret = xc7160_write_array(xc7160->client, xc7160_global_regs);
-		if (ret) {
-				v4l2_err(sd, "could not set init registers\n");
-				pm_runtime_put_noidle(&client->dev);
-				goto unlock_and_return;
-		}
 
 
-		xc7160->isp_out_colorbar = false;
-		ret=sc8238_check_sensor_id(xc7160,xc7160->client);
-		if (ret){
-			dev_err(dev, "check sensor sc8238 id failed, color bar mode may be output!!!\n");
-			xc7160->isp_out_colorbar = true;
-		}
-	
-		// msleep(2);
-		if( xc7160->isp_out_colorbar != true ){
-			//driver setting
-			//sc8238_global_regs = sensor_30fps_t20210831_initial_regs;
-			
-			//set stream off, because it is on in default
-			ret = xc7160_write_array(xc7160->client, xc7160_stream_off_regs);
-
-			ret = xc7160_write_array(xc7160->client, xc7160_i2c_bypass_on_regs);
-			if (ret) {
-				dev_err(dev, "could not set bypass on registers\n");
-				goto unlock_and_return;
-			} 
-			
-			ret = sc8238_write_array(xc7160->client, sc8238_global_regs);
-			if (ret) {
-				dev_err(dev, "could not set sensor_initial_regs\n");
-				goto unlock_and_return;
-			} 
-
-			ret = xc7160_write_array(xc7160->client, xc7160_i2c_bypass_off_regs);
-			if (ret) {
-				dev_err(dev, "could not set bypass off registers\n");
-				goto unlock_and_return;
-			} 
-		}
-
-		
 		/* export gpio */
 		if (!IS_ERR(xc7160->reset_gpio))
 			gpiod_export(xc7160->reset_gpio, false);
@@ -883,7 +867,7 @@ static int xc7160_s_power(struct v4l2_subdev *sd, int on)
 	}
 
 unlock_and_return:
-	ret = xc7160_write_array(xc7160->client, xc7160_i2c_bypass_off_regs);
+	//ret = xc7160_write_array(xc7160->client, xc7160_i2c_bypass_off_regs);
 	mutex_unlock(&xc7160->mutex);
 
 	return ret;
