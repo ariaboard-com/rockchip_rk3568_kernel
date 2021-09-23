@@ -75,6 +75,10 @@ static void option_instat_callback(struct urb *urb);
 #define OPTION_PRODUCT_ETNA_KOI_MODEM		0x7100
 #define OPTION_PRODUCT_GTM380_MODEM		0x7201
 
+#define VENDOR_UNISOC            		0x1782
+#define NODECOM_VENDOR_ID			0x1508
+#define FIBOCOM_VENDOR_ID			0x2CB7
+
 #define HUAWEI_VENDOR_ID			0x12D1
 #define HUAWEI_PRODUCT_E173			0x140C
 #define HUAWEI_PRODUCT_E1750			0x1406
@@ -578,6 +582,28 @@ static void option_instat_callback(struct urb *urb);
 /* Device needs ZLP */
 #define ZLP		BIT(17)
 
+struct option_blacklist_info {
+	/* bitfield of interface numbers for OPTION_BLACKLIST_SENDSETUP */
+	const unsigned long sendsetup;
+	/* bitfield of interface numbers for OPTION_BLACKLIST_RESERVED_IF */
+	const unsigned long reserved;
+};
+
+static const struct option_blacklist_info fg621_012 = {
+	.reserved = BIT(0) | BIT(1) | BIT(2),
+};
+
+static const struct option_blacklist_info fg621_014 = {
+	.reserved = BIT(0) | BIT(1) | BIT(4),
+};
+
+static const struct option_blacklist_info fg621_015 = {
+	.reserved = BIT(0) | BIT(1) | BIT(5),
+};
+
+static const struct option_blacklist_info fg621_016 = {
+	.reserved = BIT(0) | BIT(1) | BIT(6),
+};
 
 static const struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(0x1286, 0x4e3c) },
@@ -613,6 +639,41 @@ static const struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(QUANTA_VENDOR_ID, QUANTA_PRODUCT_GLE) },
 	{ USB_DEVICE(QUANTA_VENDOR_ID, 0xea42),
 	  .driver_info = RSVD(4) },
+	/* Fibocom begin */
+	{ USB_DEVICE(FIBOCOM_VENDOR_ID, 0x0104) },
+	{ USB_DEVICE(FIBOCOM_VENDOR_ID, 0x0105) },
+	{ USB_DEVICE(FIBOCOM_VENDOR_ID, 0x0106) },
+	{ USB_DEVICE(FIBOCOM_VENDOR_ID, 0x0107) },
+	{ USB_DEVICE(FIBOCOM_VENDOR_ID, 0x0108) },
+	{ USB_DEVICE(FIBOCOM_VENDOR_ID, 0x0109) },
+	{ USB_DEVICE(FIBOCOM_VENDOR_ID, 0x010A) },
+	{ USB_DEVICE(FIBOCOM_VENDOR_ID, 0x010B) },
+	{ USB_DEVICE(NODECOM_VENDOR_ID, 0x1000) },
+	{ USB_DEVICE(NODECOM_VENDOR_ID, 0x1001) },
+	{ USB_DEVICE(QUALCOMM_VENDOR_ID, 0x9025) },
+	{ USB_DEVICE(QUALCOMM_VENDOR_ID, 0x90DB) },
+	/* Added by Fibocom 2020-03-12 */
+	{ USB_DEVICE(VENDOR_UNISOC, 0x4028),
+	    .driver_info = (kernel_ulong_t)&fg621_012},
+	{ USB_DEVICE(VENDOR_UNISOC, 0x4030),
+	    .driver_info = (kernel_ulong_t)&fg621_012},
+	{ USB_DEVICE(VENDOR_UNISOC, 0x4032),
+	    .driver_info = (kernel_ulong_t)&fg621_012},
+	{ USB_DEVICE(VENDOR_UNISOC, 0x4033),
+	    .driver_info = (kernel_ulong_t)&fg621_014},
+	{ USB_DEVICE(VENDOR_UNISOC, 0x4D00)},
+
+	/* For Fibocom FG621-EA */
+	{ USB_DEVICE(FIBOCOM_VENDOR_ID, 0x0A04),
+	    .driver_info = (kernel_ulong_t)&fg621_015},
+	{ USB_DEVICE(FIBOCOM_VENDOR_ID, 0x0A05),
+	    .driver_info = (kernel_ulong_t)&fg621_016},
+	{ USB_DEVICE(FIBOCOM_VENDOR_ID, 0x0A06),
+	    .driver_info = (kernel_ulong_t)&fg621_016},
+	{ USB_DEVICE(FIBOCOM_VENDOR_ID, 0x0A07),
+	    .driver_info = (kernel_ulong_t)&fg621_016},
+	/* End of changing by Fibocom 2020-03-12 */
+	/* Fibocom end */
 	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1c05, USB_CLASS_COMM, 0x02, 0xff) },
 	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1c1f, USB_CLASS_COMM, 0x02, 0xff) },
 	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0x1c23, USB_CLASS_COMM, 0x02, 0xff) },
