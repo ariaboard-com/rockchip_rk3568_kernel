@@ -68,16 +68,16 @@
         status = "okay";
         compatible = "firefly,xc7160";
         reg = <0x1b>;
-        clocks = <&cru CLK_CIF_OUT>;
+        clocks = <&cru CLK_CAM0_OUT>;
         clock-names = "xvclk";
         //avdd-supply = <&vcc_mipi>;
         power-domains = <&power RK3568_PD_VI>;
         pinctrl-names = "default";
-        pinctrl-0 = <&cif_clk>;
+        pinctrl-0 = <&cam_clkout0>;
 
         //power-gpios = <&pca9555 PCA_IO0_4 GPIO_ACTIVE_HIGH>;
-        reset-gpios = <&pca9555 PCA_IO0_0 GPIO_ACTIVE_HIGH>;
-        pwdn-gpios = <&pca9555 PCA_IO0_1 GPIO_ACTIVE_HIGH>;
+        reset-gpios = <&gpio3 RK_PD5 GPIO_ACTIVE_HIGH>;
+        pwdn-gpios = <&gpio3 RK_PD4 GPIO_ACTIVE_HIGH>;
 
         firefly,clkout-enabled-index = <0>;
         rockchip,camera-module-index = <0>;

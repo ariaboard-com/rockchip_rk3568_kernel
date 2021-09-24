@@ -15,6 +15,7 @@
 * using dual camera gc2053/gc2093   --->  rk3566-firefly-aiojd4-cam-2ms2m.dtsi
 *
 */
+#include "rk3566-firefly-aiojd4-cam-8ms1m.dtsi"
 
 / {
     model = "AIO-3566JD4 HDMI(Linux)";
