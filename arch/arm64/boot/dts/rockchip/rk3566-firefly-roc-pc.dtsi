@@ -249,11 +249,6 @@
 	led_status_value = <0x2f60>;
 };
 
-&sfc{
-     rk3566-fspi = "two-line" ;
-     status = "disabled";
-};
-
 &i2c2 {
     status = "okay";
    // pinctrl-0 = <&i2c2m1_xfer>;

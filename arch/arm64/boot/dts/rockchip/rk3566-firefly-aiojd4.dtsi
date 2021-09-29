@@ -350,11 +350,6 @@
     status = "okay";
 };
 
-&sfc{
-     rk3566-fspi = "two-line" ;
-     status = "disabled";
- };
-
 /delete-node/ &mc3230;
 &i2c4 {
     status = "okay";
