@@ -121,10 +121,15 @@ struct share_params {
 
 static struct share_params *ddr_psci_param;
 
+struct rockchip_dmcfreq_ondemand_data {
+	unsigned int upthreshold;
+	unsigned int downdifferential;
+};
+
 struct rockchip_dmcfreq {
 	struct device *dev;
 	struct devfreq *devfreq;
-	struct devfreq_simple_ondemand_data ondemand_data;
+	struct rockchip_dmcfreq_ondemand_data ondemand_data;
 	struct clk *dmc_clk;
 	struct devfreq_event_dev **edev;
 	struct mutex lock; /* serializes access to video_info_list */
@@ -133,6 +138,7 @@ struct rockchip_dmcfreq {
 	struct notifier_block status_nb;
 	struct list_head video_info_list;
 	struct freq_map_table *vop_bw_tbl;
+	struct freq_map_table *cpu_bw_tbl;
 	struct work_struct boost_work;
 	struct input_handler input_handler;
 	struct monitor_dev_info *mdev_info;
@@ -174,6 +180,7 @@ struct rockchip_dmcfreq {
 	unsigned int read_latency;
 	int edev_count;
 	int dfi_id;
+	int nocp_cpu_id;
 
 	bool is_fixed;
 	bool is_msch_rl_work_started;
@@ -563,32 +570,24 @@ static int rockchip_dmcfreq_get_dev_status(struct device *dev,
 {
 	struct rockchip_dmcfreq *dmcfreq = dev_get_drvdata(dev);
 	struct devfreq_event_data edata;
-	int i, j, ret = 0;
+	int i, ret = 0;
 
 	if (!dmcfreq->auto_freq_en)
 		return -EINVAL;
 
-	if (dmcfreq->dfi_id >= 0) {
-		ret = devfreq_event_get_event(dmcfreq->edev[dmcfreq->dfi_id],
-					      &edata);
-		if (ret < 0) {
-			dev_err(dev, "failed to get dfi event\n");
-			return ret;
-		}
-		stat->busy_time = edata.load_count;
-		stat->total_time = edata.total_count;
-	}
-
-	for (i = 0, j = 0; i < dmcfreq->edev_count; i++) {
-		if (i == dmcfreq->dfi_id)
-			continue;
+	for (i = 0; i < dmcfreq->edev_count; i++) {
 		ret = devfreq_event_get_event(dmcfreq->edev[i], &edata);
 		if (ret < 0) {
 			dev_err(dev, "failed to get event %s\n",
 				dmcfreq->edev[i]->desc->name);
 			return ret;
 		}
-		dmcfreq->nocp_bw[j++] = edata.load_count;
+		if (i == dmcfreq->dfi_id) {
+			stat->busy_time = edata.load_count;
+			stat->total_time = edata.total_count;
+		} else {
+			dmcfreq->nocp_bw[i] = edata.load_count;
+		}
 	}
 
 	return 0;
@@ -2426,6 +2425,64 @@ static ssize_t rockchip_dmcfreq_status_store(struct device *dev,
 static DEVICE_ATTR(system_status, 0644, rockchip_dmcfreq_status_show,
 		   rockchip_dmcfreq_status_store);
 
+static ssize_t upthreshold_show(struct device *dev,
+				struct device_attribute *attr,
+				char *buf)
+{
+	struct rockchip_dmcfreq *dmcfreq = dev_get_drvdata(dev->parent);
+	struct rockchip_dmcfreq_ondemand_data *data = &dmcfreq->ondemand_data;
+
+	return sprintf(buf, "%d\n", data->upthreshold);
+}
+
+static ssize_t upthreshold_store(struct device *dev,
+				 struct device_attribute *attr,
+				 const char *buf,
+				 size_t count)
+{
+	struct rockchip_dmcfreq *dmcfreq = dev_get_drvdata(dev->parent);
+	struct rockchip_dmcfreq_ondemand_data *data = &dmcfreq->ondemand_data;
+	unsigned int value;
+
+	if (kstrtouint(buf, 10, &value))
+		return -EINVAL;
+
+	data->upthreshold = value;
+
+	return count;
+}
+
+static DEVICE_ATTR_RW(upthreshold);
+
+static ssize_t downdifferential_show(struct device *dev,
+				     struct device_attribute *attr,
+				     char *buf)
+{
+	struct rockchip_dmcfreq *dmcfreq = dev_get_drvdata(dev->parent);
+	struct rockchip_dmcfreq_ondemand_data *data = &dmcfreq->ondemand_data;
+
+	return sprintf(buf, "%d\n", data->downdifferential);
+}
+
+static ssize_t downdifferential_store(struct device *dev,
+				      struct device_attribute *attr,
+				      const char *buf,
+				      size_t count)
+{
+	struct rockchip_dmcfreq *dmcfreq = dev_get_drvdata(dev->parent);
+	struct rockchip_dmcfreq_ondemand_data *data = &dmcfreq->ondemand_data;
+	unsigned int value;
+
+	if (kstrtouint(buf, 10, &value))
+		return -EINVAL;
+
+	data->downdifferential = value;
+
+	return count;
+}
+
+static DEVICE_ATTR_RW(downdifferential);
+
 static void rockchip_dmcfreq_set_msch_rl(struct rockchip_dmcfreq *dmcfreq,
 					 unsigned int readlatency)
 
@@ -2545,6 +2602,25 @@ int rockchip_dmcfreq_vop_bandwidth_request(struct devfreq *devfreq,
 }
 EXPORT_SYMBOL(rockchip_dmcfreq_vop_bandwidth_request);
 
+static unsigned long get_nocp_req_rate(struct rockchip_dmcfreq *dmcfreq)
+{
+	unsigned long target = 0, cpu_bw = 0;
+	int i;
+
+	if (!dmcfreq->cpu_bw_tbl || dmcfreq->nocp_cpu_id < 0)
+		goto out;
+
+	cpu_bw = dmcfreq->nocp_bw[dmcfreq->nocp_cpu_id];
+
+	for (i = 0; dmcfreq->cpu_bw_tbl[i].freq != CPUFREQ_TABLE_END; i++) {
+		if (cpu_bw >= dmcfreq->cpu_bw_tbl[i].min)
+			target = dmcfreq->cpu_bw_tbl[i].freq;
+	}
+
+out:
+	return target;
+}
+
 static int devfreq_dmc_ondemand_func(struct devfreq *df,
 				     unsigned long *freq)
 {
@@ -2552,10 +2628,10 @@ static int devfreq_dmc_ondemand_func(struct devfreq *df,
 	struct devfreq_dev_status *stat;
 	unsigned long long a, b;
 	struct rockchip_dmcfreq *dmcfreq = dev_get_drvdata(df->dev.parent);
-	struct devfreq_simple_ondemand_data *data = &dmcfreq->ondemand_data;
+	struct rockchip_dmcfreq_ondemand_data *data = &dmcfreq->ondemand_data;
 	unsigned int upthreshold = data->upthreshold;
 	unsigned int downdifferential = data->downdifferential;
-	unsigned long target_freq = 0;
+	unsigned long target_freq = 0, nocp_req_rate = 0;
 	u64 now;
 
 	if (dmcfreq->auto_freq_en && !dmcfreq->is_fixed) {
@@ -2563,12 +2639,12 @@ static int devfreq_dmc_ondemand_func(struct devfreq *df,
 			target_freq = dmcfreq->status_rate;
 		else if (dmcfreq->auto_min_rate)
 			target_freq = dmcfreq->auto_min_rate;
+		nocp_req_rate = get_nocp_req_rate(dmcfreq);
+		target_freq = max3(target_freq, nocp_req_rate,
+				   dmcfreq->vop_req_rate);
 		now = ktime_to_us(ktime_get());
 		if (now < dmcfreq->touchboostpulse_endtime)
-			target_freq = max3(target_freq, dmcfreq->vop_req_rate,
-					   dmcfreq->boost_rate);
-		else
-			target_freq = max(target_freq, dmcfreq->vop_req_rate);
+			target_freq = max(target_freq, dmcfreq->boost_rate);
 	} else {
 		if (dmcfreq->status_rate)
 			target_freq = dmcfreq->status_rate;
@@ -2788,10 +2864,7 @@ static int rockchip_dmcfreq_get_event(struct rockchip_dmcfreq *dmcfreq)
 	}
 	dmcfreq->auto_freq_en = true;
 	dmcfreq->dfi_id = rockchip_get_edev_id(dmcfreq, "dfi");
-	if (dmcfreq->dfi_id >= 0)
-		available_count--;
-	if (available_count <= 0)
-		return 0;
+	dmcfreq->nocp_cpu_id = rockchip_get_edev_id(dmcfreq, "nocp-cpu");
 	dmcfreq->nocp_bw =
 		devm_kzalloc(dev, sizeof(*dmcfreq->nocp_bw) * available_count,
 			     GFP_KERNEL);
@@ -2864,6 +2937,10 @@ static void rockchip_dmcfreq_parse_dt(struct rockchip_dmcfreq *dmcfreq)
 	of_property_read_u32(np, "auto-min-freq",
 			     (u32 *)&dmcfreq->auto_min_rate);
 	dmcfreq->auto_min_rate *= 1000;
+
+	if (rockchip_get_freq_map_talbe(np, "cpu-bw-dmc-freq",
+					&dmcfreq->cpu_bw_tbl))
+		dev_dbg(dev, "failed to get cpu bandwidth to dmc rate\n");
 
 	if (rockchip_get_freq_map_talbe(np, "vop-bw-dmc-freq",
 					&dmcfreq->vop_bw_tbl))
@@ -2966,6 +3043,15 @@ static void rockchip_dmcfreq_register_notifier(struct rockchip_dmcfreq *dmcfreq)
 
 static void rockchip_dmcfreq_add_interface(struct rockchip_dmcfreq *dmcfreq)
 {
+	if (sysfs_create_file(&dmcfreq->devfreq->dev.kobj,
+			      &dev_attr_upthreshold.attr))
+		dev_err(dmcfreq->dev,
+			"failed to register upthreshold sysfs file\n");
+	if (sysfs_create_file(&dmcfreq->devfreq->dev.kobj,
+			      &dev_attr_downdifferential.attr))
+		dev_err(dmcfreq->dev,
+			"failed to register downdifferential sysfs file\n");
+
 	if (!rockchip_add_system_status_interface(&dmcfreq->devfreq->dev))
 		return;
 	if (sysfs_create_file(&dmcfreq->devfreq->dev.kobj,

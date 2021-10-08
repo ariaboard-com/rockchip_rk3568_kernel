@@ -935,9 +935,13 @@ int rknpu_gem_sync_ioctl(struct drm_device *dev, void *data,
 						      DMA_FROM_DEVICE);
 		}
 	} else {
+		struct drm_device *drm = rknpu_obj->base.dev;
+		struct rknpu_device *rknpu_dev = drm->dev_private;
+
+		WARN_ON(!rknpu_dev->fake_dev);
+
 		length = args->size;
 		offset = args->offset;
-		sg_dma_addr = rknpu_obj->dma_addr;
 
 		for_each_sg(rknpu_obj->sgt->sgl, sg, rknpu_obj->sgt->nents,
 			     i) {
@@ -945,26 +949,25 @@ int rknpu_gem_sync_ioctl(struct drm_device *dev, void *data,
 			if (len <= offset)
 				continue;
 
+			sg_dma_addr = sg_dma_address(sg);
 			sg_left = len - offset;
 			sg_offset = sg->length - sg_left;
 			size = (length < sg_left) ? length : sg_left;
 
 			if (args->flags & RKNPU_MEM_SYNC_TO_DEVICE) {
 				dma_sync_single_range_for_device(
-					dev->dev, sg_dma_addr, sg_offset, size,
-					DMA_TO_DEVICE);
+					rknpu_dev->fake_dev, sg_dma_addr,
+					sg_offset, size, DMA_TO_DEVICE);
 			}
 
 			if (args->flags & RKNPU_MEM_SYNC_FROM_DEVICE) {
-				dma_sync_single_range_for_cpu(dev->dev,
-							      sg_dma_addr,
-							      sg_offset, size,
-							      DMA_FROM_DEVICE);
+				dma_sync_single_range_for_cpu(
+					rknpu_dev->fake_dev, sg_dma_addr,
+					sg_offset, size, DMA_FROM_DEVICE);
 			}
 
 			offset += size;
 			length -= size;
-			sg_dma_addr += sg->length;
 
 			if (length == 0)
 				break;

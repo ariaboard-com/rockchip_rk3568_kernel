@@ -402,6 +402,20 @@ static void update_mi(struct rkispp_stream *stream)
 		 rkispp_read(dev, stream->config->reg.cur_uv_base));
 }
 
+static void get_stream_buf(struct rkispp_stream *stream)
+{
+	unsigned long lock_flags = 0;
+
+	spin_lock_irqsave(&stream->vbq_lock, lock_flags);
+	if (!list_empty(&stream->buf_queue) && !stream->curr_buf) {
+		stream->curr_buf =
+			list_first_entry(&stream->buf_queue,
+					 struct rkispp_buffer, queue);
+		list_del(&stream->curr_buf->queue);
+	}
+	spin_unlock_irqrestore(&stream->vbq_lock, lock_flags);
+}
+
 static int rkispp_frame_end(struct rkispp_stream *stream, u32 state)
 {
 	struct rkispp_device *dev = stream->isppdev;
@@ -475,29 +489,29 @@ static int rkispp_frame_end(struct rkispp_stream *stream, u32 state)
 		stream->dbg.id = stream->curr_buf->vb.sequence;
 
 		stream->curr_buf = NULL;
-	} else if (stream->is_reg_withstream &&
-		   (fmt->wr_fmt & FMT_FBC || fmt->wr_fmt == FMT_YUV420)) {
-		u32 frame_id;
+	} else {
+		u32 frame_id = dev->ispp_sdev.frm_sync_seq;
 
-		frame_id = dev->ispp_sdev.frm_sync_seq;
-		rkispp_find_regbuf_by_id(dev, &reg_buf, dev->dev_id, frame_id);
-		if (reg_buf) {
-			rkispp_release_regbuf(dev, reg_buf);
-			v4l2_info(&dev->v4l2_dev,
-				  "%s: current frame use dummy buffer(dev_id %d, sequence %d)\n",
-				  __func__, dev->dev_id, frame_id);
+		if (stream->is_cfg) {
+			stream->dbg.frameloss++;
+			v4l2_dbg(0, rkispp_debug, &dev->v4l2_dev,
+				 "stream:%d no buf, lost frame:%d\n",
+				 stream->id, frame_id);
+		}
+
+		if (stream->is_reg_withstream &&
+		    (fmt->wr_fmt & FMT_FBC || fmt->wr_fmt == FMT_YUV420)) {
+			rkispp_find_regbuf_by_id(dev, &reg_buf, dev->dev_id, frame_id);
+			if (reg_buf) {
+				rkispp_release_regbuf(dev, reg_buf);
+				v4l2_info(&dev->v4l2_dev,
+					  "%s: current frame use dummy buffer(dev_id %d, sequence %d)\n",
+					  __func__, dev->dev_id, frame_id);
+			}
 		}
 	}
 
-	spin_lock_irqsave(&stream->vbq_lock, lock_flags);
-	if (!list_empty(&stream->buf_queue) && !stream->curr_buf) {
-		stream->curr_buf =
-			list_first_entry(&stream->buf_queue,
-					 struct rkispp_buffer, queue);
-		list_del(&stream->curr_buf->queue);
-	}
-	spin_unlock_irqrestore(&stream->vbq_lock, lock_flags);
-
+	get_stream_buf(stream);
 	update_mi(stream);
 	return 0;
 }
@@ -1191,8 +1205,6 @@ static int config_modules(struct rkispp_device *dev)
 {
 	int ret;
 
-	rkispp_start_3a_run(dev);
-
 	v4l2_dbg(1, rkispp_debug, &dev->v4l2_dev,
 		 "stream module ens:0x%x\n", dev->stream_vdev.module_ens);
 	dev->stream_vdev.monitor.monitoring_module = 0;
@@ -1251,6 +1263,7 @@ static int start_ii(struct rkispp_stream *stream)
 static int config_ii(struct rkispp_stream *stream)
 {
 	stream->is_cfg = true;
+	rkispp_start_3a_run(stream->isppdev);
 	return config_modules(stream->isppdev);
 }
 
@@ -1780,6 +1793,8 @@ static int start_isp(struct rkispp_device *dev)
 		return 0;
 	}
 
+	rkispp_start_3a_run(dev);
+
 	mutex_lock(&dev->hw_dev->dev_lock);
 
 	mode.work_mode = dev->isp_mode;
@@ -2269,6 +2284,89 @@ unreg:
 	return ret;
 }
 
+static void dump_file(struct rkispp_device *dev, u32 restart_module)
+{
+	struct rkispp_stream_vdev *vdev = &dev->stream_vdev;
+	void __iomem *base = dev->hw_dev->base_addr;
+	struct rkispp_isp_buf_pool *buf;
+	struct rkispp_dummy_buffer *dummy;
+	struct file *fp = NULL;
+	char file[160], reg[48];
+	int i;
+
+	snprintf(file, sizeof(file), "%s/%s%d.reg",
+		 rkispp_dump_path, DRIVER_NAME, dev->dev_id);
+	fp = filp_open(file, O_RDWR | O_CREAT, 0644);
+	if (IS_ERR(fp)) {
+		v4l2_err(&dev->v4l2_dev, "%s open %s fail\n", __func__, file);
+		return;
+	}
+	for (i = 0; i < 0x1000; i += 16) {
+		snprintf(reg, sizeof(reg), "ffb6%04x:  %08x %08x %08x %08x\n",
+			 i, readl(base + i), readl(base + i + 4),
+			 readl(base + i + 8), readl(base + i + 12));
+		kernel_write(fp, reg, strlen(reg), &fp->f_pos);
+	}
+	filp_close(fp, NULL);
+
+	if (restart_module & MONITOR_TNR) {
+		if (vdev->tnr.cur_rd) {
+			snprintf(file, sizeof(file), "%s/%s%d_tnr_cur.fbc",
+				 rkispp_dump_path, DRIVER_NAME, dev->dev_id);
+			fp = filp_open(file, O_RDWR | O_CREAT, 0644);
+			if (IS_ERR(fp)) {
+				v4l2_err(&dev->v4l2_dev,
+					 "%s open %s fail\n", __func__, file);
+				return;
+			}
+			buf = get_pool_buf(dev, vdev->tnr.cur_rd);
+			kernel_write(fp, buf->vaddr[0], vdev->tnr.cur_rd->dbuf[0]->size, &fp->f_pos);
+			filp_close(fp, NULL);
+			v4l2_dbg(1, rkispp_debug, &dev->v4l2_dev,
+				 "dump tnr cur_rd dma:0x%x vaddr:%p\n",
+				 buf->dma[0], buf->vaddr[0]);
+		}
+
+		if (vdev->tnr.nxt_rd && vdev->tnr.nxt_rd != vdev->tnr.cur_rd) {
+			snprintf(file, sizeof(file), "%s/%s%d_tnr_nxt.fbc",
+				 rkispp_dump_path, DRIVER_NAME, dev->dev_id);
+			fp = filp_open(file, O_RDWR | O_CREAT, 0644);
+			if (IS_ERR(fp)) {
+				v4l2_err(&dev->v4l2_dev,
+					 "%s open %s fail\n", __func__, file);
+				return;
+			}
+			buf = get_pool_buf(dev, vdev->tnr.nxt_rd);
+			kernel_write(fp, buf->vaddr[0], vdev->tnr.nxt_rd->dbuf[0]->size, &fp->f_pos);
+			filp_close(fp, NULL);
+			v4l2_dbg(1, rkispp_debug, &dev->v4l2_dev,
+				 "dump tnr nxt_rd dma:0x%x vaddr:%p\n",
+				 buf->dma[0], buf->vaddr[0]);
+		}
+	}
+
+	if (!(restart_module & MONITOR_FEC)) {
+		for (i = 0; i < RKISPP_BUF_MAX; i++) {
+			dummy = &vdev->tnr.buf.wr[i][0];
+			if (!dummy->mem_priv)
+				break;
+			snprintf(file, sizeof(file), "%s/%s%d_iir%d.fbc",
+				 rkispp_dump_path, DRIVER_NAME, dev->dev_id, i);
+			fp = filp_open(file, O_RDWR | O_CREAT, 0644);
+			if (IS_ERR(fp)) {
+				v4l2_err(&dev->v4l2_dev,
+					 "%s open %s fail\n", __func__, file);
+				return;
+			}
+			kernel_write(fp, dummy->vaddr, dummy->size, &fp->f_pos);
+			filp_close(fp, NULL);
+			v4l2_dbg(1, rkispp_debug, &dev->v4l2_dev,
+				 "dump tnr wr dma:0x%x vaddr:%p\n",
+				 dummy->dma_addr, dummy->vaddr);
+		}
+	}
+}
+
 static void restart_module(struct rkispp_device *dev)
 {
 	struct rkispp_monitor *monitor = &dev->stream_vdev.monitor;
@@ -2279,7 +2377,6 @@ static void restart_module(struct rkispp_device *dev)
 	v4l2_dbg(1, rkispp_debug, &dev->v4l2_dev,
 		 "%s enter\n", __func__);
 	if (dev->ispp_sdev.state == ISPP_STOP || monitor->retry > 3) {
-		monitor->is_en = false;
 		monitor->is_restart = false;
 		goto end;
 	}
@@ -2287,9 +2384,16 @@ static void restart_module(struct rkispp_device *dev)
 		wait_for_completion_timeout(&monitor->cmpl,
 					    msecs_to_jiffies(500));
 	if (dev->ispp_sdev.state == ISPP_STOP) {
-		monitor->is_en = false;
 		monitor->is_restart = false;
 		goto end;
+	}
+
+	if (rkispp_dump_path[0] == '/')
+		dump_file(dev, monitor->restart_module);
+
+	if (monitor->restart_module & MONITOR_TNR && monitor->tnr.is_err) {
+		rkispp_set_bits(dev, RKISPP_TNR_CTRL, 0, SW_TNR_1ST_FRM);
+		monitor->tnr.is_err = false;
 	}
 	rkispp_soft_reset(dev->hw_dev);
 	rkispp_update_regs(dev, RKISPP_CTRL_QUICK, RKISPP_FEC_CROP);
@@ -2305,6 +2409,32 @@ static void restart_module(struct rkispp_device *dev)
 			complete(&monitor->tnr.cmpl);
 	}
 	if (monitor->restart_module & MONITOR_NR) {
+		if (monitor->nr.is_err) {
+			struct rkispp_stream_vdev *vdev = &dev->stream_vdev;
+			struct v4l2_subdev *sd = dev->ispp_sdev.remote_sd;
+			struct rkispp_buffer *inbuf;
+
+			if (vdev->nr.cur_rd) {
+				if (vdev->nr.cur_rd->is_isp) {
+					v4l2_subdev_call(sd, video, s_rx_buffer,
+							 vdev->nr.cur_rd, NULL);
+				} else if (!vdev->nr.cur_rd->priv) {
+					list_add_tail(&vdev->nr.cur_rd->list,
+						      &vdev->tnr.list_wr);
+				} else {
+					inbuf = vdev->nr.cur_rd->priv;
+					vb2_buffer_done(&inbuf->vb.vb2_buf, VB2_BUF_STATE_DONE);
+				}
+				vdev->nr.cur_rd = NULL;
+			}
+			rkispp_set_bits(dev, RKISPP_TNR_CTRL, 0, SW_TNR_1ST_FRM);
+			vdev->nr.is_end = true;
+			monitor->nr.is_err = false;
+			monitor->is_restart = false;
+			monitor->restart_module = 0;
+			rkispp_event_handle(dev, CMD_QUEUE_DMABUF, NULL);
+			goto end;
+		}
 		val |= NR_SHP_ST;
 		monitor->monitoring_module |= MONITOR_NR;
 		if (!completion_done(&monitor->nr.cmpl))
@@ -2338,7 +2468,7 @@ static void restart_monitor(struct work_struct *work)
 
 	v4l2_dbg(1, rkispp_debug, &dev->v4l2_dev,
 		 "%s module:0x%x enter\n", __func__, m_monitor->module);
-	while (monitor->is_en) {
+	while (monitor->is_en && dev->ispp_sdev.state != ISPP_STOP) {
 		/* max timeout for module idle */
 		time = MAX_SCHEDULE_TIMEOUT;
 		if (monitor->monitoring_module & m_monitor->module)
@@ -2348,7 +2478,7 @@ static void restart_monitor(struct work_struct *work)
 		if (!(monitor->monitoring_module & m_monitor->module) ||
 		    ret || !monitor->is_en)
 			continue;
-		if (dev->hw_dev->is_shutdown)
+		if (dev->hw_dev->is_shutdown || dev->ispp_sdev.state == ISPP_STOP)
 			break;
 		v4l2_dbg(1, rkispp_debug, &dev->v4l2_dev,
 			 "module:0x%x wait %ldms timeout ret:%d, monitoring:0x%x\n",
@@ -2480,9 +2610,19 @@ static void fec_work_event(struct rkispp_device *dev,
 			dev->ispp_sdev.frm_sync_seq = seq;
 		}
 
+		/* check MB config and output buf beforce start, when MB connect to FEC
+		 * MB update by FEC_FORCE_UPD
+		 */
 		stream = &vdev->stream[STREAM_MB];
-		if (stream->streaming && !stream->is_cfg)
-			secure_config_mb(stream);
+		if (stream->streaming) {
+			if (!stream->is_cfg) {
+				secure_config_mb(stream);
+			} else if (!stream->curr_buf) {
+				get_stream_buf(stream);
+				if (stream->curr_buf)
+					update_mi(stream);
+			}
+		}
 
 		if (!dev->hw_dev->is_single)
 			rkispp_update_regs(dev, RKISPP_FEC, RKISPP_FEC_CROP);
@@ -2702,9 +2842,10 @@ static void nr_work_event(struct rkispp_device *dev,
 			dbuf = vdev->nr.cur_rd->dbuf[GROUP_BUF_PIC];
 			dummy = dbuf_to_dummy(dbuf, &vdev->tnr.buf.iir, size);
 			val = dummy->dma_addr;
-			if (dev->hw_dev->is_first && dev->hw_dev->first_frame_dma != -1) {
-				val = dev->hw_dev->first_frame_dma;
-				dev->hw_dev->first_frame_dma = -1;
+			if (dev->is_first && dev->first_frame_dma != -1) {
+				val = dev->first_frame_dma;
+				dev->first_frame_dma = -1;
+				dev->is_first = false;
 			}
 			rkispp_write(dev, RKISPP_NR_ADDR_BASE_Y, val);
 			val += vdev->nr.uv_offset;
@@ -2760,9 +2901,31 @@ static void nr_work_event(struct rkispp_device *dev,
 			}
 		}
 
+		/* check MB config and output buf beforce start, when MB connect to SHARP
+		 * MB update by OTHER_FORCE_UPD
+		 */
 		stream = &vdev->stream[STREAM_MB];
-		if (!is_fec_en && stream->streaming && !stream->is_cfg)
-			secure_config_mb(stream);
+		if (!is_fec_en && stream->streaming) {
+			if (!stream->is_cfg) {
+				secure_config_mb(stream);
+			} else if (!stream->curr_buf) {
+				get_stream_buf(stream);
+				if (stream->curr_buf)
+					update_mi(stream);
+			}
+		}
+
+		/* check SCL output buf beforce start
+		 * SCL update by OTHER_FORCE_UPD
+		 */
+		for (val = STREAM_S0; val <= STREAM_S2; val++) {
+			stream = &vdev->stream[val];
+			if (!stream->streaming || !stream->is_cfg || stream->curr_buf)
+				continue;
+			get_stream_buf(stream);
+			if (stream->curr_buf)
+				update_mi(stream);
+		}
 
 		if (!dev->hw_dev->is_single) {
 			if (vdev->nr.cur_rd &&
@@ -2786,7 +2949,7 @@ static void nr_work_event(struct rkispp_device *dev,
 			 seq, readl(base + RKISPP_NR_ADDR_BASE_Y_SHD),
 			 readl(base + RKISPP_SHARP_WR_Y_BASE_SHD));
 
-		for (val = STREAM_S0; val <= STREAM_S2; val++) {
+		for (val = STREAM_S0; val <= STREAM_S2 && !is_fec_en; val++) {
 			stream = &vdev->stream[val];
 			if (stream->stopping && stream->ops->stop)
 				stream->ops->stop(stream);
@@ -2797,6 +2960,7 @@ static void nr_work_event(struct rkispp_device *dev,
 		if (monitor->is_en) {
 			monitor->nr.time = vdev->nr.dbg.interval / 1000 / 1000;
 			monitor->monitoring_module |= MONITOR_NR;
+			monitor->nr.is_err = false;
 			if (!completion_done(&monitor->nr.cmpl))
 				complete(&monitor->nr.cmpl);
 		}
@@ -2902,10 +3066,11 @@ static void tnr_work_event(struct rkispp_device *dev,
 	if (!buf_rd && !buf_wr && is_isr) {
 		vdev->tnr.is_end = true;
 
-		if (dev->hw_dev->is_first && vdev->tnr.nxt_rd) {
+		if (dev->is_first && vdev->tnr.nxt_rd) {
 			struct rkispp_isp_buf_pool *tbuf = get_pool_buf(dev, vdev->tnr.nxt_rd);
 
-			dev->hw_dev->first_frame_dma = tbuf->dma[GROUP_BUF_PIC];
+			dev->first_frame_dma = tbuf->dma[GROUP_BUF_PIC];
+			rkispp_set_bits(dev, RKISPP_TNR_CTRL, 0, SW_TNR_1ST_FRM);
 		}
 
 		if (vdev->tnr.cur_rd) {
@@ -2988,8 +3153,7 @@ static void tnr_work_event(struct rkispp_device *dev,
 		vdev->tnr.cur_rd = vdev->tnr.nxt_rd;
 		vdev->tnr.nxt_rd = buf_rd;
 		/* first buf for 3to1 using twice */
-		if (!is_3to1 ||
-		    (rkispp_read(dev, RKISPP_TNR_CTRL) & SW_TNR_1ST_FRM))
+		if (!is_3to1 || dev->is_first)
 			vdev->tnr.cur_rd = vdev->tnr.nxt_rd;
 	} else if (vdev->tnr.is_end && !list_empty(list)) {
 		/* tnr read buf from list
@@ -3048,7 +3212,7 @@ static void tnr_work_event(struct rkispp_device *dev,
 				val = buf->dma[GROUP_BUF_GAIN];
 				rkispp_write(dev, RKISPP_TNR_GAIN_NXT_Y_BASE, val);
 
-				if (rkispp_read(dev, RKISPP_TNR_CTRL) & SW_TNR_1ST_FRM)
+				if (dev->is_first)
 					vdev->tnr.cur_rd = NULL;
 			}
 		}
@@ -3107,6 +3271,7 @@ static void tnr_work_event(struct rkispp_device *dev,
 		if (monitor->is_en) {
 			monitor->tnr.time = vdev->tnr.dbg.interval / 1000 / 1000;
 			monitor->monitoring_module |= MONITOR_TNR;
+			monitor->tnr.is_err = false;
 			if (!completion_done(&monitor->tnr.cmpl))
 				complete(&monitor->tnr.cmpl);
 		}
@@ -3302,9 +3467,10 @@ void rkispp_isr(u32 mis_val, struct rkispp_device *dev)
 {
 	struct rkispp_stream_vdev *vdev;
 	struct rkispp_stream *stream;
-	u32 i, err_mask = NR_LOST_ERR | TNR_LOST_ERR |
-		FBCH_EMPTY_NR | FBCH_EMPTY_TNR | FBCD_DEC_ERR_NR |
-		FBCD_DEC_ERR_TNR | BUS_ERR_NR | BUS_ERR_TNR;
+	u32 i, nr_err = NR_LOST_ERR | FBCH_EMPTY_NR |
+		FBCD_DEC_ERR_NR | BUS_ERR_NR;
+	u32 tnr_err = TNR_LOST_ERR | FBCH_EMPTY_TNR |
+		FBCD_DEC_ERR_TNR | BUS_ERR_TNR;
 	u64 ns = ktime_get_ns();
 
 	v4l2_dbg(3, rkispp_debug, &dev->v4l2_dev,
@@ -3312,7 +3478,11 @@ void rkispp_isr(u32 mis_val, struct rkispp_device *dev)
 
 	vdev = &dev->stream_vdev;
 	dev->isr_cnt++;
-	if (mis_val & err_mask) {
+	if (mis_val & (tnr_err | nr_err)) {
+		if (mis_val & tnr_err)
+			vdev->monitor.tnr.is_err = true;
+		if (mis_val & nr_err)
+			vdev->monitor.nr.is_err = true;
 		dev->isr_err_cnt++;
 		v4l2_err(&dev->v4l2_dev,
 			 "ispp err:0x%x, seq:%d\n",
@@ -3362,7 +3532,8 @@ void rkispp_isr(u32 mis_val, struct rkispp_device *dev)
 			continue;
 		if (stream->stopping &&
 		    stream->ops->is_stopped &&
-		    stream->ops->is_stopped(stream)) {
+		    (stream->ops->is_stopped(stream) ||
+		     dev->ispp_sdev.state == ISPP_STOP)) {
 			stream->stopping = false;
 			stream->streaming = false;
 			stream->is_upd = false;
