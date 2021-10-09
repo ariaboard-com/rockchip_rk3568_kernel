@@ -989,10 +989,6 @@ static int rk817_digital_mute(struct snd_soc_dai *dai, int mute)
 					      DAC_DIG_CLK_EN, DAC_DIG_CLK_DIS);
 		snd_soc_component_update_bits(component, RK817_CODEC_DTOP_DIGEN_CLKE,
 					      DAC_DIG_CLK_EN, DAC_DIG_CLK_EN);
-
-		snd_soc_component_write(component, RK817_CODEC_ADAC_CFG1,
-					PWD_DACBIAS_ON | PWD_DACD_ON |
-					PWD_DACL_ON | PWD_DACR_ON);
 	} else {
 		snd_soc_component_update_bits(component,
 					      RK817_CODEC_DDAC_MUTE_MIXCTL,
