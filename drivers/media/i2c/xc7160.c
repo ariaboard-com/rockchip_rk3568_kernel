@@ -720,7 +720,7 @@ static int sc8238_check_sensor_id(struct xc7160 *xc7160,
 		dev_err(dev, "%s: could not set bypass on registers\n",__func__);
 		return ret;
 	}
-	msleep(1);
+
 	ret = sc8238_read_reg(client, SC8238_CHIP_REG_ID1_ZYK	,
 			       XC7160_REG_VALUE_08BIT, &id);
 	if (id == SC8238_CHIP_ID1_ZYK	) {
@@ -746,7 +746,7 @@ static int sc8238_check_sensor_id(struct xc7160 *xc7160,
 
 static int __xc7160_start_stream(struct xc7160 *xc7160)
 {
-	int ret;
+	int ret, i;
 	struct device *dev = &xc7160->client->dev;
 
 	//driver setting
@@ -773,9 +773,12 @@ static int __xc7160_start_stream(struct xc7160 *xc7160)
 		ret = xc7160_write_array(xc7160->client, xc7160_i2c_bypass_on_regs);
 		if (ret)
 			dev_err(dev, "could not set bypass on registers\n");
-		msleep(1);
-		ret = sc8238_write_array(xc7160->client, sc8238_global_regs);
 
+		for (i = 0; i <= 3; i++){
+			ret = sc8238_write_array(xc7160->client, sc8238_global_regs);
+			if (!ret)
+				break;
+		}
 		xc7160_write_array(xc7160->client, xc7160_i2c_bypass_off_regs);
 		if (ret){
 			dev_err(dev, "failed to initialize sc8238 register, output color bar\n");
