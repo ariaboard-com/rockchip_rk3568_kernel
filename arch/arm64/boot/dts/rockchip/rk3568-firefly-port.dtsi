@@ -153,6 +153,29 @@
 		BT,wake_host_irq = <&gpio3 RK_PA2 GPIO_ACTIVE_HIGH>;
 		status = "disabled";
 	};
+
+	flash_led: flash-led {
+		compatible = "led,rgb13h";
+		label = "pwm-flash-led";
+		led-max-microamp = <20000>;
+		flash-max-microamp = <20000>;
+		flash-max-timeout-us = <1000000>;
+		pwms = <&pwm11 0 25000 0>;
+		rockchip,camera-module-index = <1>;
+		rockchip,camera-module-facing = "front";
+		status = "disabled";
+	};
+
+	vcc_camera: vcc-camera-regulator {
+		compatible = "regulator-fixed";
+		gpio = <&pca9555 PCA_IO0_0 GPIO_ACTIVE_HIGH>;
+		//gpio = <&pca9555 PCA_IO0_3 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&vcc_cam>;
+		regulator-name = "vcc_camera";
+		enable-active-high;
+		status = "disabled";
+	};
 };
 
 &combphy0_us {
@@ -563,7 +586,7 @@
 
 &pinctrl {
 	cam {
-		camera_pwr: camera-pwr {
+		vcc_cam: vcc-cam {
 			rockchip,pins =
 				/* camera power en */
 				<0 RK_PC1 RK_FUNC_GPIO &pcfg_pull_none>;

@@ -7,6 +7,7 @@
 /dts-v1/;
 
 #include "rk3568-firefly-aioj.dtsi"
+#include "rk3568-firefly-aioj-cam-2ms2m.dtsi"
 
 / {
     model = "IPC-M10R800-A3568J MIPI M101014-BE45-A1 (Linux)";

@@ -151,6 +151,7 @@ struct gc2093 {
 	const struct gc2093_mode *cur_mode;
 
 	u32		module_index;
+	u32		clkout_enabled_index;
 	const char      *module_facing;
 	const char      *module_name;
 	const char      *len_name;
@@ -558,6 +559,7 @@ static int gc2093_set_ctrl(struct v4l2_ctrl *ctrl)
 					     struct gc2093, ctrl_handler);
 	s64 max;
 	int ret = 0;
+	int val;
 
 	/* Propagate change of current control to all related controls */
 	switch (ctrl->id) {
@@ -575,6 +577,8 @@ static int gc2093_set_ctrl(struct v4l2_ctrl *ctrl)
 
 	switch (ctrl->id) {
 	case V4L2_CID_EXPOSURE:
+		if (val > 1100)
+			val = 1100;
 		dev_dbg(gc2093->dev, "set exposure value 0x%x\n", ctrl->val);
 		ret = gc2093_write_reg(gc2093, GC2093_REG_EXP_LONG_H,
 				       (ctrl->val >> 8) & 0x3f);
@@ -696,17 +700,19 @@ static int __gc2093_power_on(struct gc2093 *gc2093)
 	int ret;
 	struct device *dev = gc2093->dev;
 
-	ret = clk_set_rate(gc2093->xvclk, GC2093_XVCLK_FREQ);
-	if (ret < 0)
-		dev_warn(dev, "Failed to set xvclk rate\n");
+	if (gc2093->clkout_enabled_index){
+		ret = clk_set_rate(gc2093->xvclk, GC2093_XVCLK_FREQ);
+		if (ret < 0)
+			dev_warn(dev, "Failed to set xvclk rate\n");
 
-	if (clk_get_rate(gc2093->xvclk) != GC2093_XVCLK_FREQ)
-		dev_warn(dev, "xvclk mismatched, modes are based on 27MHz\n");
+		if (clk_get_rate(gc2093->xvclk) != GC2093_XVCLK_FREQ)
+			dev_warn(dev, "xvclk mismatched, modes are based on 27MHz\n");
 
-	ret = clk_prepare_enable(gc2093->xvclk);
-	if (ret < 0) {
-		dev_err(dev, "Failed to enable xvclk\n");
-		return ret;
+		ret = clk_prepare_enable(gc2093->xvclk);
+		if (ret < 0) {
+			dev_err(dev, "Failed to enable xvclk\n");
+			return ret;
+		}
 	}
 
 	ret = regulator_bulk_enable(GC2093_NUM_SUPPLIES, gc2093->supplies);
@@ -730,7 +736,8 @@ static int __gc2093_power_on(struct gc2093 *gc2093)
 	return 0;
 
 disable_clk:
-	clk_disable_unprepare(gc2093->xvclk);
+	if (gc2093->clkout_enabled_index)
+		clk_disable_unprepare(gc2093->xvclk);
 	return ret;
 }
 
@@ -742,7 +749,8 @@ static void __gc2093_power_off(struct gc2093 *gc2093)
 		gpiod_set_value_cansleep(gc2093->pwdn_gpio, 0);
 
 	regulator_bulk_disable(GC2093_NUM_SUPPLIES, gc2093->supplies);
-	clk_disable_unprepare(gc2093->xvclk);
+	if (gc2093->clkout_enabled_index)
+		clk_disable_unprepare(gc2093->xvclk);
 }
 
 static int gc2093_check_sensor_id(struct gc2093 *gc2093)
@@ -1377,10 +1385,18 @@ static int gc2093_probe(struct i2c_client *client,
 		return -EINVAL;
 	}
 
-	gc2093->xvclk = devm_clk_get(gc2093->dev, "xvclk");
-	if (IS_ERR(gc2093->xvclk)) {
-		dev_err(gc2093->dev, "Failed to get xvclk\n");
-		return -EINVAL;
+	ret = of_property_read_u32(node, "firefly,clkout-enabled-index", &gc2093->clkout_enabled_index);
+	if (ret) {
+		dev_err(dev, "could not get firefly,clkout-enabled-index, default output xvclk\n");
+		gc2093->clkout_enabled_index = 1;
+	}
+
+	if (gc2093->clkout_enabled_index){
+		gc2093->xvclk = devm_clk_get(gc2093->dev, "xvclk");
+		if (IS_ERR(gc2093->xvclk)) {
+			dev_err(gc2093->dev, "Failed to get xvclk\n");
+			return -EINVAL;
+		}
 	}
 
 	gc2093->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
