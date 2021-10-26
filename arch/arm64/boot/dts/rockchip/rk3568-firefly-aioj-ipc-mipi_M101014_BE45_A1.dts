@@ -72,7 +72,8 @@
 
 &route_dsi1 {
     status = "okay";
-    logo,rotation = "270";
+    logo,rotation = <270>;
+    logo,mode = "center";
     connect = <&vp1_out_dsi1>;
 };
 
