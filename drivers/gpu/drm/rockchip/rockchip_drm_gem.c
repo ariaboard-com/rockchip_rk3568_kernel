@@ -258,7 +258,7 @@ static int rockchip_gem_alloc_dma(struct rockchip_gem_object *rk_obj,
 		rk_obj->dma_attrs |= DMA_ATTR_NO_KERNEL_MAPPING;
 
 	rk_obj->kvaddr = dma_alloc_attrs(drm->dev, obj->size,
-					 &rk_obj->dma_addr, GFP_KERNEL,
+					 &rk_obj->dma_handle, GFP_KERNEL,
 					 rk_obj->dma_attrs);
 	if (!rk_obj->kvaddr) {
 		DRM_ERROR("failed to allocate %zu byte dma buffer", obj->size);
@@ -272,7 +272,7 @@ static int rockchip_gem_alloc_dma(struct rockchip_gem_object *rk_obj,
 	}
 
 	ret = dma_get_sgtable_attrs(drm->dev, sgt, rk_obj->kvaddr,
-				    rk_obj->dma_addr, obj->size,
+				    rk_obj->dma_handle, obj->size,
 				    rk_obj->dma_attrs);
 	if (ret) {
 		DRM_ERROR("failed to allocate sgt, %d\n", ret);
@@ -310,7 +310,7 @@ err_sgt_free:
 	kfree(sgt);
 err_dma_free:
 	dma_free_attrs(drm->dev, obj->size, rk_obj->kvaddr,
-		       rk_obj->dma_addr, rk_obj->dma_attrs);
+		       rk_obj->dma_handle, rk_obj->dma_attrs);
 
 	return ret;
 }
@@ -352,7 +352,7 @@ static int rockchip_gem_alloc_secure(struct rockchip_gem_object *rk_obj)
 		return -ENOMEM;
 	}
 
-	rk_obj->dma_addr = paddr;
+	rk_obj->dma_handle = paddr;
 	rk_obj->num_pages = rk_obj->base.size >> PAGE_SHIFT;
 
 	rk_obj->pages = drm_calloc_large(rk_obj->num_pages,
@@ -396,7 +396,7 @@ static void rockchip_gem_free_secure(struct rockchip_gem_object *rk_obj)
 	drm_free_large(rk_obj->pages);
 	sg_free_table(rk_obj->sgt);
 	kfree(rk_obj->sgt);
-	gen_pool_free(private->secure_buffer_pool, rk_obj->dma_addr,
+	gen_pool_free(private->secure_buffer_pool, rk_obj->dma_handle,
 		      rk_obj->base.size);
 }
 
@@ -449,7 +449,8 @@ static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
 		if (ret < 0)
 			goto err_free;
 	} else {
-		WARN_ON(!rk_obj->dma_addr);
+		WARN_ON(!rk_obj->dma_handle);
+		rk_obj->dma_addr = rk_obj->dma_handle;
 	}
 
 	return 0;
@@ -476,7 +477,7 @@ static void rockchip_gem_free_dma(struct rockchip_gem_object *rk_obj)
 	sg_free_table(rk_obj->sgt);
 	kfree(rk_obj->sgt);
 	dma_free_attrs(drm->dev, obj->size, rk_obj->kvaddr,
-		       rk_obj->dma_addr, rk_obj->dma_attrs);
+		       rk_obj->dma_handle, rk_obj->dma_attrs);
 }
 
 static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
@@ -1039,29 +1040,13 @@ static int rockchip_gem_prime_sgl_sync_range(struct device *dev,
 	dma_addr_t sg_dma_addr;
 
 	for_each_sg(sgl, sg, nents, i) {
-		if (sg_dma_len(sg) == 0)
-			break;
-
-		if (i > 0) {
-			pr_warn_ratelimited("Partial cmo only supported with 1 segment\n"
-				"is dma_set_max_seg_size being set on dev:%s\n",
-				dev_name(dev));
-			return -EINVAL;
-		}
-	}
-
-	for_each_sg(sgl, sg, nents, i) {
 		unsigned int sg_offset, sg_left, size = 0;
 
-		if (i == 0)
-			sg_dma_addr = sg_dma_address(sg);
-
 		len += sg->length;
-		if (len <= offset) {
-			sg_dma_addr += sg->length;
+		if (len <= offset)
 			continue;
-		}
 
+		sg_dma_addr = sg_dma_address(sg);
 		sg_left = len - offset;
 		sg_offset = sg->length - sg_left;
 
@@ -1075,7 +1060,6 @@ static int rockchip_gem_prime_sgl_sync_range(struct device *dev,
 
 		offset += size;
 		length -= size;
-		sg_dma_addr += sg->length;
 
 		if (length == 0)
 			break;

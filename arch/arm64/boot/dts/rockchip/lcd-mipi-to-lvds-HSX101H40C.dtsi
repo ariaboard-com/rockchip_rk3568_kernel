@@ -233,7 +233,7 @@
 &route_dsi0 {
     status = "okay";
 };
-&mipi_dphy0 {
+&video_phy0 {
     status = "okay";
 };
 &dsi0_in_vp0 {

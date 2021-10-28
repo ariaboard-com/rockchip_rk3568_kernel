@@ -36,6 +36,8 @@
 	opp-1056000000 {
 		opp-hz = /bits/ 64 <1056000000>;
 		opp-microvolt = <900000>;
+		opp-microvolt-L0 = <900000>;
+		opp-microvolt-L1 = <850000>;
 	};
 	/delete-node/ opp-1560000000;
 };
@@ -73,5 +75,3 @@
 /delete-node/ &pcie3x2;
 /delete-node/ &qos_pcie3x1;
 /delete-node/ &qos_pcie3x2;
-/delete-node/ &qos_sata2;
-/delete-node/ &sata2;

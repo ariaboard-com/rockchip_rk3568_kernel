@@ -1097,7 +1097,7 @@ static void fbcon_init(struct vc_data *vc, int init)
 	if (con_is_visible(vc) && vc->vc_mode == KD_TEXT) {
 		if (info->fbops->fb_set_par &&
 		    !(ops->flags & FBCON_FLAGS_INIT)) {
-			ret = info->fbops->fb_set_par(info);
+			//ret = info->fbops->fb_set_par(info);
 
 			if (ret)
 				printk(KERN_ERR "fbcon_init: detected "
@@ -1305,6 +1305,9 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 		fbcon_add_cursor_timer(info);
 
 	ops->cursor_flash = (mode == CM_ERASE) ? 0 : 1;
+
+	if (!ops->cursor)
+		return;
 
 	ops->cursor(vc, info, mode, get_color(vc, info, c, 1),
 		    get_color(vc, info, c, 0));
@@ -2022,7 +2025,7 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 			return -EINVAL;
 
 		DPRINTK("resize now %ix%i\n", var.xres, var.yres);
-		if (con_is_visible(vc)) {
+		if (con_is_visible(vc) && vc->vc_mode == KD_TEXT) {
 			var.activate = FB_ACTIVATE_NOW |
 				FB_ACTIVATE_FORCE;
 			fb_set_var(info, &var);

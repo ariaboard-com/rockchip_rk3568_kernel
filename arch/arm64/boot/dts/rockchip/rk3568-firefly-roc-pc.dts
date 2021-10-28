@@ -8,6 +8,15 @@
 
 #include "rk3568-firefly-roc-pc.dtsi"
 
+/*
+*								select camera
+*
+* using single camera xc7160        --->  rk3568-firefly-roc-pc-cam-8ms1m.dtsi
+* using dual camera gc2053/gc2093   --->  rk3568-firefly-roc-pc-cam-2ms2m.dtsi
+*
+*/
+#include "rk3568-firefly-roc-pc-cam-8ms1m.dtsi"
+
 / {
     model = "Firefly RK3568-ROC-PC HDMI (Linux)";
     compatible = "rockchip,rk3568-firefly-roc-pc", "rockchip,rk3568";

@@ -55,6 +55,10 @@
 	status = "okay";
 };
 
+&rockchip_suspend {
+	status = "okay";
+};
+
 &vop {
-	disable-afbc-win;
+	disable-win-move;
 };

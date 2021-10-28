@@ -6,9 +6,10 @@
 
 #include "rk3568-firefly-port.dtsi"
 #include "rk3566-diff.dtsi"
-#include "lcd-mipi-to-lvds-HSX101H40C.dtsi"
+//#include "lcd-mipi-to-lvds-HSX101H40C.dtsi"
 
 / {
+/*
     sd_vcc3v3_power: sd-vcc3v3-power {
         compatible = "regulator-fixed";
         enable-active-high;
@@ -24,44 +25,104 @@
             regulator-off-in-suspend;
         };
    };
+*/
+	vcc_5v: vcc-5v-regulator {
+		compatible = "regulator-fixed";
+		enable-active-high;
+		gpio = <&gpio0 RK_PD6 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&vcc_5v_en>;
+		regulator-name = "vcc_5v";
+		regulator-always-on;
+	};
+	
+	/* USB vbus config */
+	vcc5v0_host30: vcc5v0-host30-regulator {
+		compatible = "regulator-fixed";
+		enable-active-high;
+		gpio = <&gpio4 RK_PA5 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&vcc5v0_host30_en>;
+		regulator-name = "vcc5v0_host30";
+		regulator-always-on;
+	};
 
-    firefly_leds: leds {
-       compatible = "gpio-leds";
-       power_led: power {
-           label = "firefly:blue:power";
-           linux,default-trigger = "ir-power-click";
-           default-state = "on";
-           gpios = <&gpio4 RK_PA6 GPIO_ACTIVE_HIGH>;
-           pinctrl-names = "default";
-           pinctrl-0 = <&led_power>;
-       };
+	vcc5v0_host: vcc5v0-host-regulator {
+		compatible = "regulator-fixed";
+		enable-active-high;
+		gpio = <&gpio3 RK_PD2 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&vcc5v0_host_en>;
+		regulator-name = "vcc5v0_host";
+		regulator-always-on;
+	};
 
-       user_led: user {
-           label = "firefly:yellow:user";
-           linux,default-trigger = "ir-user-click";
-           default-state = "off";
-           gpios = <&gpio4 RK_PA7 GPIO_ACTIVE_HIGH>;
-           pinctrl-names = "default";
-           pinctrl-0 = <&led_user>;
-       };
-   };
+	vcc_hub_reset: vcc-hub-reset-regulator {
+		compatible = "regulator-fixed";
+		enable-active-high;
+		gpio = <&gpio3 RK_PB0 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&vcc_hub_reset_en>;
+		regulator-name = "vcc_hub_reset_en";
+		regulator-always-on;
+	};
+
+	vcc5v0_otg: vcc5v0-otg-regulator {
+		compatible = "regulator-fixed";
+		enable-active-high;
+		gpio = <&gpio3 RK_PD1 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&vcc5v0_otg_en>;
+		regulator-name = "vcc5v0_otg";
+	};
+
+	vcc_4g_power: vcc_4g-power-regulator {
+		compatible = "regulator-fixed";
+		enable-active-high;
+		gpio = <&gpio0 RK_PD3 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&vcc_4g_power_en>;
+		regulator-name = "vcc_4g_power";
+		regulator-always-on;
+	};
+
+	firefly_leds: leds {
+		compatible = "gpio-leds";
+		power_led: power {
+			label = "firefly:blue:power";
+			linux,default-trigger = "ir-power-click";
+			default-state = "on";
+			gpios = <&gpio4 RK_PB6 GPIO_ACTIVE_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&led_power>;
+		};
+
+		user_led: user {
+			label = "firefly:yellow:user";
+			linux,default-trigger = "ir-user-click";
+			default-state = "off";
+			gpios = <&gpio4 RK_PB0 GPIO_ACTIVE_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&led_user>;
+		};
+
+		fan_ctl: fan-ctl {
+			label = "firefly:fan_ctl:user";
+			linux,default-trigger = "ir-user-click";
+			default-state = "on";
+			gpios = <&gpio4 RK_PA1 GPIO_ACTIVE_HIGH>;
+		};
+	};
 };
 
-/* USB vbus config  */
-&vcc5v0_host {
-    gpio = <&gpio4 RK_PB0 0>;
-    pinctrl-names = "default";
-    pinctrl-0 = <&vcc5v0_host_vbus_en>;
-};
-&vcc5v0_otg {
-    gpio = <&gpio0 RK_PD6 0>;
-    pinctrl-names = "default";
-    pinctrl-0 = <&vcc5v0_otg_vbus_en>;
-};
-
-/* sdcard config */
+/* sdcard config
 &sdmmc0 {
     vmmc-supply = <&sd_vcc3v3_power>;
+};*/
+
+&route_hdmi {
+	status = "okay";
+	connect = <&vp0_out_hdmi>;
 };
 
 /* WiFi config */
@@ -97,7 +158,7 @@
 };
 
 &wireless_wlan {
-    wifi_chip_type = "ap6356s";
+    wifi_chip_type = "ap6255";
     pinctrl-names = "default";
     pinctrl-0 = <&wifi_host_wake_irq>;
     //WIFI,poweren_gpio = <&gpio3 29 0>;
@@ -115,10 +176,7 @@
 &wireless_bluetooth {
     uart_rts_gpios = <&gpio2 RK_PB5 GPIO_ACTIVE_LOW>;
     pinctrl-names = "default", "rts_gpio";
-    pinctrl-0 = <&uart1m0_rtsn
-        &bt_host_wake_gpio
-        &bt_poweren
-        &bt_host_wake_irq>;
+    pinctrl-0 = <&uart1m0_rtsn>;
     pinctrl-1 = <&uart1_rts_gpio>;
     BT,reset_gpio    = <&gpio2 RK_PB7 GPIO_ACTIVE_HIGH>;
     BT,wake_gpio     = <&gpio2 RK_PC0 GPIO_ACTIVE_HIGH>;
@@ -126,28 +184,65 @@
     status = "okay";
 };
 
+&rk809 {
+	rtc {
+		status = "disabled";
+	};
+};
+
 &rk809_codec {
-    hp-ctl-gpios = <&gpio4 RK_PC3 GPIO_ACTIVE_HIGH>;
-    spk-ctl-gpios = <&gpio0 RK_PA6 GPIO_ACTIVE_HIGH>;
-    io-channels = <&saradc 3>;
+    hp-ctl-gpios = <&gpio3 RK_PD0 GPIO_ACTIVE_HIGH>;
+    spk-ctl-gpios = <&gpio1 RK_PA4 GPIO_ACTIVE_HIGH>;
+    io-channels = <&saradc 2>;
     hp-det-adc-value = <941>;
     hp_adc_drift_scope = <20>;
     board-spk-from-hp;
 };
+
 &spk_ctl_gpio{
-	rockchip,pins = <0 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>;
+	rockchip,pins = <1 RK_PA4 RK_FUNC_GPIO &pcfg_pull_up>;
 };
+
 &can1{
 	status = "disabled";
 };
 
+&uart0 {
+	status = "okay";
+};
+
+&uart3 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart3m0_xfer>;
+};
+
+&uart5 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart5m1_xfer>;
+};
+
+&uart9 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart9m1_xfer>;
+};
+
+/delete-node/ &pcie30_3v3;
+/* pcie multiplex with sata2 */
 &pcie2x1 {
-    reset-gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
+    reset-gpios = <&gpio1 RK_PB2 GPIO_ACTIVE_HIGH>;
     pinctrl-names = "default";
     pinctrl-0 = <&pcie_reset_gpio>;
     /delete-property/ vpcie3v3-supply;
     status = "okay";
 };
+
+&sata2 {
+	status = "disabled";
+};
+/* choose only one to enable */
 
 &its {
     status = "okay";
@@ -159,19 +254,30 @@
 
 &pinctrl {
 	usb {
-		vcc5v0_otg_vbus_en: vcc5v0-vbus-en {
+		vcc_5v_en: vcc-5v-en {
 			rockchip,pins = <0 RK_PD6 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
-		vcc5v0_host_vbus_en: vcc5v0-host-en {
-			rockchip,pins = <4 RK_PB0 RK_FUNC_GPIO &pcfg_pull_none>;
+		vcc5v0_otg_en: vcc5v0-otg-en {
+			rockchip,pins = <3 RK_PD1 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+		vcc5v0_host_en: vcc5v0-host-en {
+			rockchip,pins = <3 RK_PD2 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+		vcc5v0_host30_en: vcc5v0-host30-en {
+			rockchip,pins = <4 RK_PA5 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+		vcc_hub_reset_en: vcc-hub-reset-en {
+			rockchip,pins = <3 RK_PB0 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
+
+/*
 	sd {
 		sd_vcc3v3_power_en: sd-vcc3v3-power-en {
 			rockchip,pins = <0 RK_PA5 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
-
+*/
     wireless-wlan {
         wifi_host_wake_irq: wifi-host-wake-irq {
             rockchip,pins = <2 RK_PB2 RK_FUNC_GPIO &pcfg_pull_down>;
@@ -196,16 +302,23 @@
 
     pcie {
         pcie_reset_gpio: pcie-reset-gpio {
-			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <1 RK_PB2 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
     };
+
+	4g {
+		vcc_4g_power_en: vcc-4g-power-en {
+			rockchip,pins = <0 RK_PD3 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
     leds {
          led_power: led-power {
-             rockchip,pins = <4 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
+             rockchip,pins = <4 RK_PB6 RK_FUNC_GPIO &pcfg_pull_none>;
          };
 
          led_user: led-user {
-             rockchip,pins = <4 RK_PA7 RK_FUNC_GPIO &pcfg_pull_none>;
+             rockchip,pins = <4 RK_PB0 RK_FUNC_GPIO &pcfg_pull_none>;
          };
     };
 };
@@ -237,88 +350,43 @@
     status = "okay";
 };
 
- &sfc{
-     rk3566-fspi = "two-line" ;
-     status = "disabled";
- };
+/delete-node/ &mc3230;
+&i2c4 {
+    status = "okay";
 
+	mc3230: mc3230sensor@4c {
+		compatible = "gs_mc3230";
+		reg = <0x4c>;
+		type = <SENSOR_TYPE_ACCEL>;
+		irq_enable = <0>;
+		poll_delay_ms = <30>;
+		layout = <4>;
+		status = "okay";
+	};
+};
+
+/delete-node/ &hym8563;
 &i2c2 {
-    status = "okay";
-   // pinctrl-0 = <&i2c2m1_xfer>;
-    XC7022b: XC7022b@1b{
-        status = "okay";
-        compatible = "firefly,xc7022";
-        reg = <0x1b>;
-        clocks = <&cru CLK_CIF_OUT>;
-        clock-names = "xvclk";
-        //avdd-supply = <&vcc_mipi>;
-        pinctrl-names = "rockchip,camera_default";
-        pinctrl-0 = <&cif_clk>;
-        mipi-pwr-gpios = <&gpio4 RK_PC1 GPIO_ACTIVE_HIGH>;
-        reset-gpios = <&gpio4 RK_PB6 GPIO_ACTIVE_HIGH>;
-        pwdn-gpios = <&gpio0 RK_PB4 GPIO_ACTIVE_HIGH>;
-        
-        //firefly,clkout-enabled-index = <0>;
-        rockchip,camera-module-index = <1>;
-        rockchip,camera-module-facing = "front";
-        rockchip,camera-module-name = "NC";
-        rockchip,camera-module-lens-name = "NC";
-        port {
-            xc7022b_out: endpoint {
-                remote-endpoint = <&dphy1_in>;
-                data-lanes = <1 2>;
-                
-            };
-        };
-    };
+	status = "okay";
+
+	hym8563: hym8563@51 {
+		status = "okay";
+		compatible = "haoyu,hym8563";
+		reg = <0x51>;
+		#clock-cells = <0>;
+		rtc-irq-gpio = <&gpio0 RK_PD4 IRQ_TYPE_EDGE_FALLING>;
+		clock-frequency = <32768>;
+	};
 };
 
-&csi2_dphy_hw {
-    status = "okay";
-};
-
-&isp0_in {
-   remote-endpoint = <&dphy1_out>; 
-};
-
-&csi2_dphy0{
-    status="disabled";
-};
-
-&csi2_dphy2{
-    status = "disabled";
+&csi2_dphy0 {
+	status = "disabled";
 };
 
 &csi2_dphy1 {
-    status = "okay";
-        /*
-         * dphy1 only used for split mode,
-         * can be used  concurrently  with dphy2
-         * full mode and split mode are mutually exclusive
-         */
-        ports {
-            #address-cells = <1>;
-            #size-cells = <0>;
-                port@0 {
-                    reg = <0>;
-                    #address-cells = <1>;
-                    #size-cells = <0>;
-                        dphy1_in: endpoint@1 {
-                            reg = <1>;
-                            remote-endpoint = <&xc7022b_out>;
-                            data-lanes = <1 2>;
-                        };
-                };
-                port@1 {
-                    reg = <1>;
-                    #address-cells = <1>;
-                    #size-cells = <0>;
-                        dphy1_out: endpoint@1 {
-                            reg = <1>;
-                            remote-endpoint = <&isp0_in>;
-                            
-                        };
-                };
-        };
+	status = "disabled";
 };
 
+&csi2_dphy2 {
+	status = "disabled";
+};

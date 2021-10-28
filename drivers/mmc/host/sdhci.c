@@ -1650,7 +1650,7 @@ EXPORT_SYMBOL_GPL(sdhci_set_power);
  *                                                                           *
 \*****************************************************************************/
 
-static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
+void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 {
 	struct sdhci_host *host;
 	int present;
@@ -1689,6 +1689,7 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	mmiowb();
 	spin_unlock_irqrestore(&host->lock, flags);
 }
+EXPORT_SYMBOL_GPL(sdhci_request);
 
 void sdhci_set_bus_width(struct sdhci_host *host, int width)
 {
@@ -3766,7 +3767,7 @@ int sdhci_setup_host(struct sdhci_host *host)
 	    ((host->flags & SDHCI_USE_ADMA) ||
 	     !(host->flags & SDHCI_USE_SDMA)) &&
 	     !(host->quirks2 & SDHCI_QUIRK2_ACMD23_BROKEN)) {
-		host->flags |= SDHCI_AUTO_CMD23;
+		//host->flags |= SDHCI_AUTO_CMD23;
 		DBG("Auto-CMD23 available\n");
 	} else {
 		DBG("Auto-CMD23 unavailable\n");

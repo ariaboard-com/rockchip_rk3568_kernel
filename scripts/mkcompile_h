@@ -50,6 +50,9 @@ else
 	LINUX_COMPILE_HOST=$KBUILD_BUILD_HOST
 fi
 
+LINUX_BRANCH=$(git branch | grep "\*" | awk -F ' ' '{print $2}')
+LINUX_COMMIT=$(git log -1 | grep "commit" | awk -F ' ' '{print $2}')
+
 UTS_VERSION="#$VERSION"
 CONFIG_FLAGS=""
 if [ -n "$SMP" ] ; then CONFIG_FLAGS="SMP"; fi
@@ -72,6 +75,9 @@ UTS_TRUNCATE="cut -b -$UTS_LEN"
 
   echo \#define LINUX_COMPILE_BY \"`echo $LINUX_COMPILE_BY | $UTS_TRUNCATE`\"
   echo \#define LINUX_COMPILE_HOST \"`echo $LINUX_COMPILE_HOST | $UTS_TRUNCATE`\"
+
+  echo \#define LINUX_BRANCH \"`echo $LINUX_BRANCH | $UTS_TRUNCATE`\"
+  echo \#define LINUX_COMMIT \"`echo $LINUX_COMMIT | $UTS_TRUNCATE`\"
 
   CC_VERSION=$($CC -v 2>&1 | grep ' version ' | sed 's/[[:space:]]*$//')
   LD_VERSION=$($LD -v | head -n1 | sed 's/(compatible with [^)]*)//' \

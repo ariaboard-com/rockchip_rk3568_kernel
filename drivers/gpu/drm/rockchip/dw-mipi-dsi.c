@@ -833,7 +833,6 @@ static ssize_t dw_mipi_dsi_transfer(struct dw_mipi_dsi *dsi,
 	if (msg->flags & MIPI_DSI_MSG_USE_LPM) {
 		regmap_update_bits(dsi->regmap, DSI_VID_MODE_CFG,
 				   LP_CMD_EN, LP_CMD_EN);
-        regmap_update_bits(dsi->regmap, DSI_LPCLK_CTRL, PHY_TXREQUESTCLKHS, PHY_TXREQUESTCLKHS);
 	} else {
 		regmap_update_bits(dsi->regmap, DSI_VID_MODE_CFG, LP_CMD_EN, 0);
 		regmap_update_bits(dsi->regmap, DSI_LPCLK_CTRL,
@@ -1096,7 +1095,7 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
 	if (dsi->panel)
 		drm_panel_disable(dsi->panel);
 
-	if (dsi->pdata->soc_type == RK3568)
+	if (IS_ENABLED(CONFIG_CPU_RK3568) && dsi->pdata->soc_type == RK3568)
 		vop2_standby(encoder->crtc, 1);
 
 	dw_mipi_dsi_disable(dsi);
@@ -1104,7 +1103,7 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
 		drm_panel_unprepare(dsi->panel);
 	dw_mipi_dsi_post_disable(dsi);
 
-	if (dsi->pdata->soc_type == RK3568)
+	if (IS_ENABLED(CONFIG_CPU_RK3568) && dsi->pdata->soc_type == RK3568)
 		vop2_standby(encoder->crtc, 0);
 }
 
@@ -1340,7 +1339,7 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
 
 	dw_mipi_dsi_vop_routing(dsi);
 
-	if (dsi->pdata->soc_type == RK3568)
+	if (IS_ENABLED(CONFIG_CPU_RK3568) && dsi->pdata->soc_type == RK3568)
 		vop2_standby(encoder->crtc, 1);
 
 	dw_mipi_dsi_pre_enable(dsi);
@@ -1348,7 +1347,7 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
 		drm_panel_prepare(dsi->panel);
 	dw_mipi_dsi_enable(dsi);
 
-	if (dsi->pdata->soc_type == RK3568)
+	if (IS_ENABLED(CONFIG_CPU_RK3568) && dsi->pdata->soc_type == RK3568)
 		vop2_standby(encoder->crtc, 0);
 
 	if (dsi->panel)

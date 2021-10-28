@@ -655,6 +655,7 @@ static struct scmi_prot_devnames devnames[] = {
 	{ SCMI_PROTOCOL_PERF,   { "cpufreq" },},
 	{ SCMI_PROTOCOL_CLOCK,  { "clocks" },},
 	{ SCMI_PROTOCOL_SENSOR, { "hwmon" },},
+	{ SCMI_PROTOCOL_RESET,  { "reset" },},
 };
 
 static inline void
@@ -804,6 +805,7 @@ static int __init scmi_driver_init(void)
 	scmi_clock_register();
 	scmi_perf_register();
 	scmi_power_register();
+	scmi_reset_register();
 	scmi_sensors_register();
 
 	return platform_driver_register(&scmi_driver);
@@ -817,6 +819,7 @@ static void __exit scmi_driver_exit(void)
 	scmi_clock_unregister();
 	scmi_perf_unregister();
 	scmi_power_unregister();
+	scmi_reset_unregister();
 	scmi_sensors_unregister();
 
 	platform_driver_unregister(&scmi_driver);
