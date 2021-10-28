@@ -249,40 +249,9 @@
 	led_status_value = <0x2f60>;
 };
 
- &sfc{
-     rk3566-fspi = "two-line" ;
-     status = "disabled";
- };
-
 &i2c2 {
     status = "okay";
    // pinctrl-0 = <&i2c2m1_xfer>;
-    XC7022b: XC7022b@1b{
-        status = "okay";
-        compatible = "firefly,xc7022";
-        reg = <0x1b>;
-        clocks = <&cru CLK_CIF_OUT>;
-        clock-names = "xvclk";
-        //avdd-supply = <&vcc_mipi>;
-        pinctrl-names = "rockchip,camera_default";
-        pinctrl-0 = <&cif_clk>;
-        mipi-pwr-gpios = <&gpio4 RK_PC1 GPIO_ACTIVE_HIGH>;
-        reset-gpios = <&gpio4 RK_PB6 GPIO_ACTIVE_HIGH>;
-        pwdn-gpios = <&gpio0 RK_PB4 GPIO_ACTIVE_HIGH>;
-
-        //firefly,clkout-enabled-index = <0>;
-        rockchip,camera-module-index = <1>;
-        rockchip,camera-module-facing = "front";
-        rockchip,camera-module-name = "NC";
-        rockchip,camera-module-lens-name = "NC";
-        port {
-            xc7022b_out: endpoint {
-                remote-endpoint = <&dphy1_in>;
-                data-lanes = <1 2>;
-
-            };
-        };
-    };
 
 	hym8563: hym8563@51 {
 		status = "okay";
@@ -296,14 +265,6 @@
 	};
 };
 
-&csi2_dphy_hw {
-    status = "okay";
-};
-
-&isp0_in {
-   remote-endpoint = <&dphy1_out>;
-};
-
 &csi2_dphy0{
     status="disabled";
 };
@@ -313,36 +274,12 @@
 };
 
 &csi2_dphy1 {
-    status = "okay";
-        /*
-         * dphy1 only used for split mode,
-         * can be used  concurrently  with dphy2
-         * full mode and split mode are mutually exclusive
-         */
-        ports {
-            #address-cells = <1>;
-            #size-cells = <0>;
-                port@0 {
-                    reg = <0>;
-                    #address-cells = <1>;
-                    #size-cells = <0>;
-                        dphy1_in: endpoint@1 {
-                            reg = <1>;
-                            remote-endpoint = <&xc7022b_out>;
-                            data-lanes = <1 2>;
-                        };
-                };
-                port@1 {
-                    reg = <1>;
-                    #address-cells = <1>;
-                    #size-cells = <0>;
-                        dphy1_out: endpoint@1 {
-                            reg = <1>;
-                            remote-endpoint = <&isp0_in>;
-
-                        };
-                };
-        };
+    status = "disabled";
+   /*
+    * dphy1 only used for split mode,
+    * can be used  concurrently  with dphy2
+    * full mode and split mode are mutually exclusive
+    */
 };
 
 &rk809 {

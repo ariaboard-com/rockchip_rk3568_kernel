@@ -177,7 +177,9 @@ uvc_v4l2_qbuf(struct file *file, void *fh, struct v4l2_buffer *b)
 	if (ret < 0)
 		return ret;
 
-	return uvcg_video_pump(video);
+	queue_work(video->async_wq, &video->pump);
+
+	return ret;
 }
 
 static int
@@ -200,6 +202,9 @@ uvc_v4l2_streamon(struct file *file, void *fh, enum v4l2_buf_type type)
 
 	if (type != video->queue.queue.type)
 		return -EINVAL;
+
+	if (uvc->state != UVC_STATE_CONNECTED)
+		return -ENODEV;
 
 	/* Enable UVC video. */
 	ret = uvcg_video_enable(video, 1);

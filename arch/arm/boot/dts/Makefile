@@ -855,8 +855,10 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rv1126-ai-cam-ddr3-v1-spi-nand.dtb \
 	rv1126-ai-cam-plus.dtb \
 	rv1126-bat-evb-v10.dtb \
+	rv1126-bat-evb-v11.dtb \
 	rv1126-bat-ipc-v10.dtb \
 	rv1126-bat-ipc-4k-v10.dtb \
+	rv1126-dictionary-pen-v11.dtb \
 	rv1126-evb-ddr3-v10.dtb \
 	rv1126-evb-ddr3-v10-robot.dtb \
 	rv1126-evb-ddr3-v12.dtb \
@@ -873,6 +875,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rv1126-iotest-v10.dtb \
 	rv1126-ipc2-ddr3-v10.dtb \
 	rv1126-rmsl-ddr3-v1.dtb \
+	rv1126-snapshot.dtb \
 	rv1126-sphericalipc-ddr3-v10.dtb \
 	rk3036-evb.dtb \
 	rk3036-kylin.dtb \

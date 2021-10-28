@@ -53,21 +53,21 @@
 		compatible = "gpio-leds";
 
 		power_led: power {
-			label = "firefly:red:power";
+			label = "firefly:blue:power";
 			linux,default-trigger = "ir-power-click";
 			default-state = "on";
-			gpios = <&gpio1 RK_PB1 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpio1 RK_PB2 GPIO_ACTIVE_HIGH>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&led_power>;
 		};
 
-		user_led: diy {
-			label = "firefly:blue:diy";
-			linux,default-trigger = "ir-diy1-click";
+		user_led: user {
+			label = "firefly:yellow:user";
+			linux,default-trigger = "ir-user-click";
 			default-state = "off";
-			gpios = <&gpio1 RK_PB2 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpio1 RK_PB1 GPIO_ACTIVE_HIGH>;
 			pinctrl-names = "default";
-			pinctrl-0 = <&led_diy>;
+			pinctrl-0 = <&led_user>;
 		};
 
 
@@ -75,38 +75,7 @@
 };
 
 &csi2_dphy0 {
-	status = "okay";
-
-	ports {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		port@0 {
-			reg = <0>;
-			#address-cells = <1>;
-			#size-cells = <0>;
-
-			mipi_in_ucam3: endpoint@4 {
-				reg = <4>;
-				remote-endpoint = <&xc7022b_out>;
-				data-lanes = <1 2>;
-			};
-			mipi_in_ucam4: endpoint@5 {
-				reg = <5>;
-				remote-endpoint = <&xc6130b_out>;
-				data-lanes = <1 2>;
-			};
-		};
-		port@1 {
-			reg = <1>;
-			#address-cells = <1>;
-			#size-cells = <0>;
-
-			csidphy_out: endpoint@0 {
-				reg = <0>;
-				remote-endpoint = <&isp0_in>;
-			};
-		};
-	};
+	status = "disabled";
 };
 
 &i2c0 {
@@ -130,58 +99,6 @@
 
 &i2c4 {
 	status = "okay";
-	XC7022b: XC7022b@1b {
-		 status = "okay";
-		 compatible = "firefly,xc7022";
-		 reg = <0x1b>;
-		 clocks = <&cru CLK_CIF_OUT>;
-		 clock-names = "xvclk";
-		 //avdd-supply = <&vcc_mipi>;
-		 pinctrl-names = "rockchip,camera_default";
-		 pinctrl-0 = <&cif_clk>;
-
-		 //power-gpios = <&gpio0 RK_PC1 GPIO_ACTIVE_HIGH>;
-		 reset-gpios = <&gpio0 RK_PD5 GPIO_ACTIVE_HIGH>;
-		 pwdn-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_HIGH>;
-
-		 firefly,clkout-enabled-index = <0>;
-		 rockchip,camera-module-index = <1>;
-		 rockchip,camera-module-facing = "front";
-		 rockchip,camera-module-name = "NC";
-		 rockchip,camera-module-lens-name = "NC";
-		 port {
-			xc7022b_out: endpoint {
-				 remote-endpoint = <&mipi_in_ucam3>;
-				 data-lanes = <1 2>;
-			 };
-		 };
-	};
-
-	XC6130b: XC6130b@23 {
-		 status = "disabled";
-		 compatible = "firefly,xc7022";
-		 reg = <0x23>;
-		 clocks = <&cru CLK_CIF_OUT>;
-		 clock-names = "xvclk";
-		 pinctrl-names = "rockchip,camera_default";
-		 pinctrl-0 = <&cif_clk>;
-
-		 power-gpios = <&pca9555 PCA_IO0_2 GPIO_ACTIVE_HIGH>;
-		 reset-gpios = <&pca9555 PCA_IO0_0 GPIO_ACTIVE_HIGH>;
-		 pwdn-gpios = <&pca9555 PCA_IO0_1 GPIO_ACTIVE_HIGH>;
-
-		 firefly,clkout-enabled-index = <0>;
-		 rockchip,camera-module-index = <0>;
-		 rockchip,camera-module-facing = "back";
-		 rockchip,camera-module-name = "NC";
-		 rockchip,camera-module-lens-name = "NC";
-		 port {
-			xc6130b_out: endpoint {
-				 remote-endpoint = <&mipi_in_ucam4>;
-				 data-lanes = <1 2>;
-			 };
-		 };
-	 };
 };
 
 &pca9555 {
@@ -359,11 +276,11 @@
 
 	leds {
 	    led_power: led-power {
-			rockchip,pins = <1 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <1 RK_PB2 RK_FUNC_GPIO &pcfg_pull_none>;
 	    };
 
-	    led_diy: led-diy {
-			rockchip,pins = <1 RK_PB2 RK_FUNC_GPIO &pcfg_pull_none>;
+	    led_user: led-user {
+			rockchip,pins = <1 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
 	    };
 	};
 };

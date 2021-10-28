@@ -74,42 +74,37 @@
 			default-state = "on";
 			gpios = <&pca9555 PCA_IO1_0 GPIO_ACTIVE_HIGH>;
 		};
-    };
+	};
 };
 
 &csi2_dphy0 {
+	status = "disabled";
+};
+
+&csi2_dphy1 {
+	status = "disabled";
+	/*
+	* dphy1 only used for split mode,
+	* can be used  concurrently  with dphy2
+	* full mode and split mode are mutually exclusive
+	*/
+};
+
+&csi2_dphy2 {
 	status = "okay";
+	/*
+	* dphy2 only used for split mode,
+	* can be used  concurrently  with dphy1
+	* full mode and split mode are mutually exclusive
+	*/
+};
 
-	ports {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		port@0 {
-			reg = <0>;
-			#address-cells = <1>;
-			#size-cells = <0>;
+&rkisp_vir0 {
+	status = "disabled";
+};
 
-			mipi_in_ucam3: endpoint@4 {
-				reg = <4>;
-				remote-endpoint = <&xc7022b_out>;
-				data-lanes = <1 2>;
-			};
-			mipi_in_ucam4: endpoint@5 {
-				reg = <5>;
-				remote-endpoint = <&xc6130b_out>;
-				data-lanes = <1 2>;
-			};
-		};
-		port@1 {
-			reg = <1>;
-			#address-cells = <1>;
-			#size-cells = <0>;
-
-			csidphy_out: endpoint@0 {
-				reg = <0>;
-				remote-endpoint = <&isp0_in>;
-			};
-		};
-	};
+&rkisp_vir1 {
+	status = "disabled";
 };
 
 &i2c1 {
@@ -118,58 +113,6 @@
 
 &i2c4 {
 	status = "okay";
-	XC7022b: XC7022b@1b {
-		 status = "okay";
-		 compatible = "firefly,xc7022";
-		 reg = <0x1b>;
-		 clocks = <&cru CLK_CIF_OUT>;
-		 clock-names = "xvclk";
-		 //avdd-supply = <&vcc_mipi>;
-		 pinctrl-names = "rockchip,camera_default";
-		 pinctrl-0 = <&cif_clk>;
-
-		 power-gpios = <&pca9555 PCA_IO0_2 GPIO_ACTIVE_HIGH>;
-		 reset-gpios = <&pca9555 PCA_IO0_0 GPIO_ACTIVE_HIGH>;
-		 pwdn-gpios = <&pca9555 PCA_IO0_1 GPIO_ACTIVE_HIGH>;
-
-		 firefly,clkout-enabled-index = <0>;
-		 rockchip,camera-module-index = <1>;
-		 rockchip,camera-module-facing = "front";
-		 rockchip,camera-module-name = "NC";
-		 rockchip,camera-module-lens-name = "NC";
-		 port {
-			xc7022b_out: endpoint {
-				 remote-endpoint = <&mipi_in_ucam3>;
-				 data-lanes = <1 2>;
-			 };
-		 };
-	};
-
-	XC6130b: XC6130b@23 {
-		 status = "disabled";
-		 compatible = "firefly,xc7022";
-		 reg = <0x23>;
-		 clocks = <&cru CLK_CIF_OUT>;
-		 clock-names = "xvclk";
-		 pinctrl-names = "rockchip,camera_default";
-		 pinctrl-0 = <&cif_clk>;
-
-		 power-gpios = <&pca9555 PCA_IO0_2 GPIO_ACTIVE_HIGH>;
-		 reset-gpios = <&pca9555 PCA_IO0_0 GPIO_ACTIVE_HIGH>;
-		 pwdn-gpios = <&pca9555 PCA_IO0_1 GPIO_ACTIVE_HIGH>;
-
-		 firefly,clkout-enabled-index = <0>;
-		 rockchip,camera-module-index = <0>;
-		 rockchip,camera-module-facing = "back";
-		 rockchip,camera-module-name = "NC";
-		 rockchip,camera-module-lens-name = "NC";
-		 port {
-			xc6130b_out: endpoint {
-				 remote-endpoint = <&mipi_in_ucam4>;
-				 data-lanes = <1 2>;
-			 };
-		 };
-	 };
 };
 
 &pca9555 {
@@ -193,7 +136,7 @@
 };
 
 &uart4 {
-        status = "okay";
+    status = "okay";
 };
 
 &spi1 {
@@ -285,6 +228,11 @@
 
 &pwm7 {
 	status = "okay";
+};
+
+&pwm11 {
+	status = "okay";
+	pinctrl-0 = <&pwm11m1_pins>;
 };
 
 &sata2 {

@@ -59,6 +59,7 @@
 		spi1 = &spi1;
 		spi2 = &spi2;
 		spi3 = &spi3;
+		spi4 = &sfc; // for U-Boot
 	};
 
 	cpus {
@@ -75,14 +76,6 @@
 			cpu-idle-states = <&CPU_SLEEP>;
 			#cooling-cells = <2>;
 			dynamic-power-coefficient = <187>;
-			power-model {
-				compatible = "simple-power-model";
-				leakage-range= <10 40>;
-				ls = <(-9196) 6360 0>;
-				static-coefficient = <100000>;
-				ts = <83822 206397 (-4300) 71>;
-				thermal-zone = "soc-thermal";
-			};
 		};
 
 		cpu1: cpu@100 {
@@ -360,12 +353,12 @@
 		soc_thermal: soc-thermal {
 			polling-delay-passive = <20>; /* milliseconds */
 			polling-delay = <1000>; /* milliseconds */
-			sustainable-power = <1475>; /* milliwatts */
+			sustainable-power = <905>; /* milliwatts */
 
 			thermal-sensors = <&tsadc 0>;
 			trips {
 				threshold: trip-point-0 {
-					temperature = <70000>;
+					temperature = <75000>;
 					hysteresis = <2000>;
 					type = "passive";
 				};
@@ -568,6 +561,7 @@
 			snps,dis-u2-freeclk-exists-quirk;
 			snps,dis-del-phy-power-chg-quirk;
 			snps,dis-tx-ipgap-linecheck-quirk;
+			snps,dis_rxdet_inp3_quirk;
 			snps,xhci-trb-ent-quirk;
 			status = "disabled";
 		};
@@ -599,6 +593,7 @@
 			snps,dis-u2-freeclk-exists-quirk;
 			snps,dis-del-phy-power-chg-quirk;
 			snps,dis-tx-ipgap-linecheck-quirk;
+			snps,dis_rxdet_inp3_quirk;
 			snps,xhci-trb-ent-quirk;
 			status = "disabled";
 		};
@@ -1485,7 +1480,8 @@
 
 	rkvdec: rkvdec@fdf80200 {
 		compatible = "rockchip,rkv-decoder-rk3568", "rockchip,rkv-decoder-v2";
-		reg = <0x0 0xfdf80200 0x0 0x400>;
+		reg = <0x0 0xfdf80200 0x0 0x400>, <0x0 0xfdf80100 0x0 0x100>;
+		reg-names = "regs", "link";
 		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "irq_dec";
 		clocks = <&cru ACLK_RKVDEC>, <&cru HCLK_RKVDEC>,
@@ -1515,6 +1511,7 @@
 		/* rcb_iova: start and size */
 		rockchip,rcb-iova = <0x10000000 65536>;
 		rockchip,rcb-min-width = <512>;
+		rockchip,task-capacity = <16>;
 		status = "disabled";
 	};
 
@@ -1962,6 +1959,31 @@
 		};
 	};
 
+	nocp_cpu: nocp-cpu@fe102000 {
+		compatible = "rockchip,rk3568-nocp";
+		reg = <0x0 0xfe102000 0x0 0x100>;
+	};
+
+	nocp_gpu_vpu_rga_venc: nocp-gpu-vpu-rga-venc@fe102400 {
+		compatible = "rockchip,rk3568-nocp";
+		reg = <0x0 0xfe102400 0x0 0x100>;
+	};
+
+	nocp_npu_vdec: nocp-vdec@fe102800 {
+		compatible = "rockchip,rk3568-nocp";
+		reg = <0x0 0xfe102800 0x0 0x100>;
+	};
+
+	nocp_vi_usb_peri_pipe: nocp-vi-usb-peri-pipe@fe102c00 {
+		compatible = "rockchip,rk3568-nocp";
+		reg = <0x0 0xfe102c00 0x0 0x100>;
+	};
+
+	nocp_vo: nocp-vo@fe103000 {
+		compatible = "rockchip,rk3568-nocp";
+		reg = <0x0 0xfe103000 0x0 0x100>;
+	};
+
 	qos_gpu: qos@fe128000 {
 		compatible = "syscon";
 		reg = <0x0 0xfe128000 0x0 0x20>;
@@ -2123,15 +2145,21 @@
 		compatible = "rockchip,rk3568-dmc";
 		interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "complete";
-		devfreq-events = <&dfi>;
+		devfreq-events = <&dfi>, <&nocp_cpu>;
 		clocks = <&scmi_clk 3>;
 		clock-names = "dmc_clk";
 		operating-points-v2 = <&dmc_opp_table>;
 		ddr_timing = <&ddr_timing>;
 		vop-bw-dmc-freq = <
 		/* min_bw(MB/s) max_bw(MB/s) freq(KHz) */
-			0	505	324000
-			506	99999	528000
+			0	572	324000
+			573	99999	528000
+		>;
+		cpu-bw-dmc-freq = <
+		/* min_bw(MB/s) max_bw(MB/s) freq(KHz) */
+			0	350	324000
+			351	400	528000
+			401	99999	780000
 		>;
 		upthreshold = <40>;
 		downdifferential = <20>;
@@ -2163,12 +2191,17 @@
 		rockchip,low-temp = <0>;
 		rockchip,low-temp-adjust-volt = <
 			/* MHz    MHz    uV */
-			   0      1560   25000
+			   0      1560   75000
 		>;
 		rockchip,leakage-voltage-sel = <
 			1   80    0
 			81  254   1
 		>;
+		rockchip,pvtm-voltage-sel = <
+			0        82000   0
+			82001    100000  1
+		>;
+		rockchip,pvtm-ch = <0 5>;
 
 		opp-1560000000 {
 			opp-hz = /bits/ 64 <1560000000>;
@@ -2176,6 +2209,11 @@
 			opp-microvolt-L0 = <900000>;
 			opp-microvolt-L1 = <850000>;
 		};
+	};
+
+	dmcdbg: dmcdbg {
+		compatible = "rockchip,rk3568-dmcdbg";
+		status = "disabled";
 	};
 
 	pcie2x1: pcie@fe260000 {
@@ -2429,8 +2467,9 @@
 		compatible = "rockchip,dwcmshc-sdhci", "snps,dwcmshc-sdhci";
 		reg = <0x0 0xfe310000 0x0 0x10000>;
 		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
-		assigned-clocks = <&cru BCLK_EMMC>, <&cru TCLK_EMMC>;
-		assigned-clock-rates = <200000000>, <24000000>;
+		assigned-clocks = <&cru BCLK_EMMC>, <&cru TCLK_EMMC>,
+				  <&cru CCLK_EMMC>;
+		assigned-clock-rates = <200000000>, <24000000>, <200000000>;
 		clocks = <&cru CCLK_EMMC>, <&cru HCLK_EMMC>,
 			 <&cru ACLK_EMMC>, <&cru BCLK_EMMC>,
 			 <&cru TCLK_EMMC>;
@@ -2604,7 +2643,7 @@
 	};
 
 	pdm: pdm@fe440000 {
-		compatible = "rockchip,rk3568-pdm", "rockchip,pdm";
+		compatible = "rockchip,rk3568-pdm";
 		reg = <0x0 0xfe440000 0x0 0x1000>;
 		clocks = <&cru MCLK_PDM>, <&cru HCLK_PDM>;
 		clock-names = "pdm_clk", "pdm_hclk";
