@@ -193,8 +193,8 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&refclk_pins>;
 
-		power-gpios = <&pca9555 PCA_IO0_3 GPIO_ACTIVE_HIGH>; //IR_PWR_EN
-		//power-gpios = <&pca9555 PCA_IO0_0 GPIO_ACTIVE_HIGH>; //IR_PWR_EN
+		//power-gpios = <&pca9555 PCA_IO0_3 GPIO_ACTIVE_HIGH>; //IR_PWR_EN
+		power-gpios = <&pca9555 PCA_IO0_0 GPIO_ACTIVE_HIGH>; //IR_PWR_EN
 		pwdn-gpios = <&pca9555 PCA_IO0_4 GPIO_ACTIVE_LOW>;
 
 		firefly,clkout-enabled-index = <1>;

@@ -168,8 +168,8 @@
 
 	vcc_camera: vcc-camera-regulator {
 		compatible = "regulator-fixed";
-		gpio = <&pca9555 PCA_IO0_0 GPIO_ACTIVE_HIGH>;
-		//gpio = <&pca9555 PCA_IO0_3 GPIO_ACTIVE_HIGH>;
+		//gpio = <&pca9555 PCA_IO0_0 GPIO_ACTIVE_HIGH>;
+		gpio = <&pca9555 PCA_IO0_3 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&vcc_cam>;
 		regulator-name = "vcc_camera";
