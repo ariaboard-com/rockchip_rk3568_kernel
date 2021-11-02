@@ -194,16 +194,16 @@
 };
 
 &route_hdmi {
-    status = "disabled";
+    status = "okay";
     connect = <&vp0_out_hdmi>;
 };
 
 &hdmi {
-    status = "disabled";
+    status = "okay";
 };
 
 &hdmi_in_vp0 {
-    status = "disabled";
+    status = "okay";
 };
 
 &hdmi_in_vp1 {
