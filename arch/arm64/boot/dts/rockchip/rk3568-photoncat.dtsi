@@ -94,7 +94,6 @@
 };
 
 &sdmmc0 {
-/*
 	max-frequency = <150000000>;
 	supports-sd;
 	bus-width = <4>;
@@ -108,10 +107,12 @@
 	pinctrl-0 = <&sdmmc0_bus4 &sdmmc0_clk &sdmmc0_cmd &sdmmc0_det1>;
 	cd-gpios = <&gpio0 RK_PB5 GPIO_ACTIVE_LOW>;
 	status = "okay";
-*/
+};
 
+&sdmmc1 {
 	max-frequency = <150000000>;
 	supports-sdio;
+	non-removable;
 	bus-width = <4>;
 	cap-sd-highspeed;
 	cap-sdio-irq;
@@ -120,16 +121,15 @@
 	vmmc-supply = <&vcc_3v3>;
 	vqmmc-supply = <&vcc_3v3>;
 	pinctrl-names = "default";
-	pinctrl-0 = <&sdmmc0_bus4 &sdmmc0_clk &sdmmc0_cmd>;
+	pinctrl-0 = <&sdmmc1_bus4 &sdmmc1_clk &sdmmc1_cmd>;
 	non-removable;
-	status = "okay";
+	status = "disabled";
 	
 	ath10k: wifi@0 {
 		reg = <0>;
 		compatible = "qcom,ath10k";
                 status = "okay";
 	};
-
 };
 
 &combphy0_us {
