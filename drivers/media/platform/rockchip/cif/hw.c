@@ -781,7 +781,7 @@ err:
 static void rkcif_iommu_cleanup(struct rkcif_hw *cif_hw)
 {
 	if (cif_hw->domain)
-		cif_hw->domain->ops->detach_dev(cif_hw->domain, cif_hw->dev);
+		iommu_detach_device(cif_hw->domain, cif_hw->dev);
 }
 
 static void rkcif_iommu_enable(struct rkcif_hw *cif_hw)
@@ -790,7 +790,7 @@ static void rkcif_iommu_enable(struct rkcif_hw *cif_hw)
 		cif_hw->domain = iommu_get_domain_for_dev(cif_hw->dev);
 
 	if (cif_hw->domain)
-		cif_hw->domain->ops->attach_dev(cif_hw->domain, cif_hw->dev);
+		iommu_attach_device(cif_hw->domain, cif_hw->dev);
 }
 
 static inline bool is_iommu_enable(struct device *dev)
@@ -958,6 +958,8 @@ static int rkcif_plat_hw_probe(struct platform_device *pdev)
 
 	rkcif_hw_soft_reset(cif_hw, true);
 
+	mutex_init(&cif_hw->dev_lock);
+
 	pm_runtime_enable(&pdev->dev);
 
 	if (data->chip_id == CHIP_RK1808_CIF ||
@@ -978,6 +980,7 @@ static int rkcif_plat_remove(struct platform_device *pdev)
 	if (cif_hw->iommu_en)
 		rkcif_iommu_cleanup(cif_hw);
 
+	mutex_destroy(&cif_hw->dev_lock);
 	if (cif_hw->chip_id != CHIP_RK1808_CIF &&
 	    cif_hw->chip_id != CHIP_RV1126_CIF &&
 	    cif_hw->chip_id != CHIP_RV1126_CIF_LITE &&

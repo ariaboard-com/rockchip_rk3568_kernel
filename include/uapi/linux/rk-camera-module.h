@@ -15,9 +15,13 @@
 #define RKMODULE_EXTEND_LINE		24
 
 #define RKMODULE_NAME_LEN		32
-#define RKMODULE_LSCDATA_LEN		441
+#define RKMODULE_LSCDATA_LEN		289
 
 #define RKMODULE_MAX_VC_CH		4
+
+#define RKMODULE_PADF_GAINMAP_LEN	1024
+#define RKMODULE_PDAF_DCCMAP_LEN	256
+#define RKMODULE_AF_OTP_MAX_LEN		3
 
 #define RKMODULE_CAMERA_MODULE_INDEX	"rockchip,camera-module-index"
 #define RKMODULE_CAMERA_MODULE_FACING	"rockchip,camera-module-facing"
@@ -160,7 +164,29 @@ struct rkmodule_lsc_inf {
 	__u16 lsc_b[RKMODULE_LSCDATA_LEN];
 	__u16 lsc_gr[RKMODULE_LSCDATA_LEN];
 	__u16 lsc_gb[RKMODULE_LSCDATA_LEN];
+
+	__u16 width;
+	__u16 height;
+	__u16 table_size;
 } __attribute__ ((packed));
+
+/**
+ * enum rkmodule_af_dir - enum of module af otp direction
+ */
+enum rkmodele_af_otp_dir {
+	AF_OTP_DIR_HORIZONTAL = 0,
+	AF_OTP_DIR_UP = 1,
+	AF_OTP_DIR_DOWN = 2,
+};
+
+/**
+ * struct rkmodule_af_otp - module af otp in one direction
+ */
+struct rkmodule_af_otp {
+	__u32 vcm_start;
+	__u32 vcm_end;
+	__u32 vcm_dir;
+};
 
 /**
  * struct rkmodule_af_inf - module af information
@@ -168,10 +194,47 @@ struct rkmodule_lsc_inf {
  */
 struct rkmodule_af_inf {
 	__u32 flag;
+	__u32 dir_cnt;
+	struct rkmodule_af_otp af_otp[RKMODULE_AF_OTP_MAX_LEN];
+} __attribute__ ((packed));
 
-	__u32 vcm_start;
-	__u32 vcm_end;
-	__u32 vcm_dir;
+/**
+ * struct rkmodule_pdaf_inf - module pdaf information
+ *
+ */
+struct rkmodule_pdaf_inf {
+	__u32 flag;
+
+	__u32 gainmap_width;
+	__u32 gainmap_height;
+	__u32 dccmap_width;
+	__u32 dccmap_height;
+	__u32 dcc_mode;
+	__u32 dcc_dir;
+	__u16 gainmap[RKMODULE_PADF_GAINMAP_LEN];
+	__u16 dccmap[RKMODULE_PDAF_DCCMAP_LEN];
+} __attribute__ ((packed));
+
+/**
+ * struct rkmodule_otp_module_inf - otp module info
+ *
+ */
+struct rkmodule_otp_module_inf {
+	__u32 flag;
+	__u8 vendor[8];
+	__u32 module_id;
+	__u16 version;
+	__u16 full_width;
+	__u16 full_height;
+	__u8 supplier_id;
+	__u8 year;
+	__u8 mouth;
+	__u8 day;
+	__u8 sensor_id;
+	__u8 lens_id;
+	__u8 vcm_id;
+	__u8 drv_id;
+	__u8 flip;
 } __attribute__ ((packed));
 
 /**
@@ -184,6 +247,8 @@ struct rkmodule_inf {
 	struct rkmodule_awb_inf awb;
 	struct rkmodule_lsc_inf lsc;
 	struct rkmodule_af_inf af;
+	struct rkmodule_pdaf_inf pdaf;
+	struct rkmodule_otp_module_inf module_inf;
 } __attribute__ ((packed));
 
 /**
