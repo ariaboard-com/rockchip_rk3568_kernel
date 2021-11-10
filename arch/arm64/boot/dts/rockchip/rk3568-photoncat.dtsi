@@ -11,8 +11,8 @@
 
 / {
 
-	model = "Rockchip RK3568 PhotonCat Linux Board";
-	compatible = "rockchip,rk3568-photoncat", "rockchip,rk3568";
+    model = "Rockchip RK3568 PhotonCat Linux Board";
+    compatible = "rockchip,rk3568-photoncat", "rockchip,rk3568";
 
 
 	gpio-leds {
@@ -27,12 +27,6 @@
 			label = "work-led";
 			gpios = <&gpio0 RK_PC7 GPIO_ACTIVE_HIGH>;
 			linux,default-trigger = "timer";
-		};
-		
-		sd-led {
-			label = "sd-led";
-			gpios = <&gpio0 RK_PB6 GPIO_ACTIVE_LOW>;
-			default-state = "on";
 		};
 	};
 
@@ -376,5 +370,14 @@
                 <0 RK_PB5 RK_FUNC_GPIO &pcfg_pull_up>;
         };
     };
+};
+
+&gpio0 {
+        sd-pwren {
+                gpio-hog;
+                gpios = <RK_PB6 GPIO_ACTIVE_LOW>;
+                output-high;
+                line-name = "sd-pwren";
+        };
 };
 
