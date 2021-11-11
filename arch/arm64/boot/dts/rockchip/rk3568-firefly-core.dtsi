@@ -13,7 +13,6 @@
 #include <dt-bindings/display/drm_mipi_dsi.h>
 #include <dt-bindings/sensor-dev.h>
 #include "rk3568.dtsi"
-#include "rk3568-linux.dtsi"
 
 / {
 	compatible = "rockchip,rk3568-firefly-core", "rockchip,rk3568";
