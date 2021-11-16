@@ -2237,7 +2237,7 @@
 		linux,pci-domain = <2>;
 		num-ib-windows = <6>;
 		num-ob-windows = <2>;
-		max-link-speed = <3>;
+		max-link-speed = <1>;
 		msi-map = <0x2000 &its 0x2000 0x1000>;
 		num-lanes = <2>;
 		phys = <&pcie30phy>;
