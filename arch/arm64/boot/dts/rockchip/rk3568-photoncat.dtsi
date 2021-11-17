@@ -248,7 +248,7 @@
 	reset-gpios = <&gpio0 RK_PC3 GPIO_ACTIVE_HIGH>;
 	vpcie3v3-supply = <&pcie30_3v3>;
 	memory-region = <&dma_trans>;
-	busno = <1>;
+	busno = <0>;
 	status = "okay";
 };
 
