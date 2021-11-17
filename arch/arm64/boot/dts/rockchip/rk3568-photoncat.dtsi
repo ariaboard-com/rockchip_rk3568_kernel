@@ -11,8 +11,8 @@
 
 / {
 
-    model = "Rockchip RK3568 PhotonCat Linux Board";
-    compatible = "rockchip,rk3568-photoncat", "rockchip,rk3568";
+	model = "Rockchip RK3568 PhotonCat Linux Board";
+	compatible = "rockchip,rk3568-photoncat", "rockchip,rk3568";
 
 
 	gpio-leds {
@@ -91,6 +91,22 @@
 		wifi_chip_type = "rtl8188eu";
 		WIFI,vbat_gpio = <&gpio4 RK_PC2 GPIO_ACTIVE_LOW>;
 		status = "okay";
+	};
+	
+	
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		dma_trans: dma_trans@3c000000 {
+			reg = <0x0 0x3c000000 0x0 0x04000000>;
+			compatible = "shared-dma-pool";
+			inactive;
+			reusable;
+			size = <0x0 0x20000000>;
+			alignment = <0x0 0x1000>;
+		};
 	};
 
 };
@@ -236,6 +252,7 @@
 &pcie3x2 {
 	reset-gpios = <&gpio0 RK_PC3 GPIO_ACTIVE_HIGH>;
 	vpcie3v3-supply = <&pcie30_3v3>;
+	memory-region = <&dma_trans>;
 	status = "okay";
 };
 
