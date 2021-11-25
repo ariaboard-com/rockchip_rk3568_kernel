@@ -288,7 +288,7 @@ static int rk817_reset(struct snd_soc_component *component)
 	snd_soc_component_write(component, RK817_CODEC_DTOP_LPT_SRST, 0x40);
 	snd_soc_component_write(component, RK817_CODEC_DDAC_POPD_DACST, 0x02);
 	snd_soc_component_write(component, RK817_CODEC_DI2S_CKM, 0x00);
-	snd_soc_component_write(component, RK817_CODEC_DTOP_DIGEN_CLKE, 0x0f);
+	snd_soc_component_write(component, RK817_CODEC_DTOP_DIGEN_CLKE, 0xff);
 	snd_soc_component_write(component, RK817_CODEC_APLL_CFG0, 0x04);
 	snd_soc_component_write(component, RK817_CODEC_APLL_CFG1, 0x58);
 	snd_soc_component_write(component, RK817_CODEC_APLL_CFG2, 0x2d);
@@ -303,12 +303,10 @@ static int rk817_reset(struct snd_soc_component *component)
 static struct rk817_reg_val_typ playback_power_up_list[] = {
 	{RK817_CODEC_AREF_RTCFG1, 0x40},
 	{RK817_CODEC_DDAC_POPD_DACST, 0x02},
-	{RK817_CODEC_DDAC_SR_LMT0, 0x02},
 	/* APLL */
 	{RK817_CODEC_APLL_CFG0, 0x04},
 	{RK817_CODEC_APLL_CFG1, 0x58},
 	{RK817_CODEC_APLL_CFG2, 0x2d},
-	{RK817_CODEC_APLL_CFG3, 0x0c},
 	{RK817_CODEC_APLL_CFG4, 0xa5},
 	{RK817_CODEC_APLL_CFG5, 0x00},
 
@@ -342,13 +340,11 @@ static struct rk817_reg_val_typ playback_power_down_list[] = {
 
 static struct rk817_reg_val_typ capture_power_up_list[] = {
 	{RK817_CODEC_AREF_RTCFG1, 0x40},
-	{RK817_CODEC_DDAC_SR_LMT0, 0x02},
 	{RK817_CODEC_DADC_SR_ACL0, 0x02},
 	/* {RK817_CODEC_DTOP_DIGEN_CLKE, 0xff}, */
 	{RK817_CODEC_APLL_CFG0, 0x04},
 	{RK817_CODEC_APLL_CFG1, 0x58},
 	{RK817_CODEC_APLL_CFG2, 0x2d},
-	{RK817_CODEC_APLL_CFG3, 0x0c},
 	{RK817_CODEC_APLL_CFG4, 0xa5},
 	{RK817_CODEC_APLL_CFG5, 0x00},
 
@@ -499,11 +495,11 @@ static const char * const rk817_playback_path_mode[] = {
 	"RING_SPK", "RING_HP", "RING_HP_NO_MIC", "RING_SPK_HP"}; /* 7-10 */
 
 static const char * const rk817_capture_path_mode[] = {
-	#ifdef RK817_CODEC_ONE_MIC
+#ifdef RK817_CODEC_ONE_MIC
 		"MIC OFF", "Main Mic"};
 #else
 	"MIC OFF", "Main Mic", "Hands Free Mic", "BT Sco Mic"};
-	#endif
+#endif
 
 static const char * const rk817_call_path_mode[] = {
 	"OFF", "RCV", "SPK", "HP", "HP_NO_MIC", "BT"}; /* 0-5 */
@@ -592,7 +588,7 @@ static int rk817_playback_path_config(struct snd_soc_component *component,
 			/* restart CLASS D, OCPP/N */
 			snd_soc_component_write(component,
 						RK817_CODEC_ACLASSD_CFG2,
-						0xc4);
+						0xf7);
 		} else {
 			/* HP_CP_EN , CP 2.3V */
 			snd_soc_component_write(component, RK817_CODEC_AHP_CP,
@@ -665,7 +661,7 @@ static int rk817_playback_path_config(struct snd_soc_component *component,
 			/* restart CLASS D, OCPP/N */
 			snd_soc_component_write(component,
 						RK817_CODEC_ACLASSD_CFG2,
-						0xc4);
+						0xf7);
 		}
 
 		snd_soc_component_write(component, RK817_CODEC_DDAC_VOLL,
@@ -733,7 +729,6 @@ static int rk817_capture_path_config(struct snd_soc_component *component,
 		if (pre_path == MIC_OFF)
 			rk817_codec_power_up(component, RK817_CODEC_CAPTURE);
 
-#if !defined(RK817_CODEC_ONE_MIC)
 		if (rk817->adc_for_loopback) {
 			/* don't need to gain when adc use for loopback */
 			snd_soc_component_update_bits(component,
@@ -751,6 +746,7 @@ static int rk817_capture_path_config(struct snd_soc_component *component,
 						0x00);
 			break;
 		}
+#if !defined(RK817_CODEC_ONE_MIC)
 		if (!rk817->mic_in_differential) {
 			snd_soc_component_write(component,
 						RK817_CODEC_DADC_VOLR,
