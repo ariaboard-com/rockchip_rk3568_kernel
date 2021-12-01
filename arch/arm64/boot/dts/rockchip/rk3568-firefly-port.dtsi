@@ -519,6 +519,7 @@
 
 &can1 {
 	status = "disabled";
+	compatible = "rockchip,can-1.0";
 	assigned-clocks = <&cru CLK_CAN1>;
 	assigned-clock-rates = <100000000>;
 	pinctrl-names = "default";
@@ -527,6 +528,7 @@
 
 &can2 {
 	status = "disabled";
+	compatible = "rockchip,can-1.0";
 	assigned-clocks = <&cru CLK_CAN2>;
 	assigned-clock-rates = <100000000>;
 	pinctrl-names = "default";
