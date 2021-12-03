@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2020 Rockchip Electronics Co., Ltd.
+ *
+ */
+
+/dts-v1/;
+
+#include "rk3568-photonicat.dtsi"
+#include "rk3568-linux.dtsi"
+
+/ {
+	model = "Rockchip RK3568 PhotoniCat Linux Board";
+	compatible = "rockchip,rk3568-photonicat", "rockchip,rk3568";
+	
+	chosen: chosen {
+		bootargs = "earlycon=uart8250,mmio32,0xfe660000 console=ttyFIQ0 rootfstype=squashfs rootwait coherent_pool=1m systemd.gpt_auto=0 cgroup_enable=memory swapaccount=1";
+	};
+};
