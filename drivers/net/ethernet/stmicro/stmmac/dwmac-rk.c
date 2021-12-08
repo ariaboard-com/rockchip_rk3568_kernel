@@ -62,6 +62,7 @@ struct rk_priv_data {
 	bool clk_enabled;
 	bool clock_input;
 	bool integrated_phy;
+	bool sgmii_enabled;
 
 	struct clk *clk_mac;
 	struct clk *gmac_clkin;
@@ -165,6 +166,8 @@ static int xpcs_setup(struct rk_priv_data *bsp_priv, int mode)
 {
 	int ret, i, id = bsp_priv->bus_id;
 	u32 val;
+
+	bsp_priv->sgmii_enabled = true;
 
 	if (mode == PHY_INTERFACE_MODE_QSGMII && id > 0)
 		return 0;
@@ -1406,8 +1409,7 @@ static void rk3568_set_gmac_sgmii_speed(struct rk_priv_data *bsp_priv, int speed
 	struct device *dev = &bsp_priv->pdev->dev;
 	unsigned int ctrl;
 
-	/* Only gmac1 set the speed for port1 */
-	if (!bsp_priv->bus_id)
+	if (!bsp_priv->sgmii_enabled)
 		return;
 
 	switch (speed) {
