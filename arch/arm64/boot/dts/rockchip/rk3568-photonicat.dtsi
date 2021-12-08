@@ -88,8 +88,8 @@
 		* rtl8188eu, rtl8723bs, rtl8723bu
 		* esp8089
 		*/
-		wifi_chip_type = "rtl8188eu";
-		WIFI,vbat_gpio = <&gpio4 RK_PC2 GPIO_ACTIVE_LOW>;
+		wifi_chip_type = "ap6210";
+		WIFI,vbat_gpio = <&gpio2 RK_PB1 GPIO_ACTIVE_HIGH>;
 		status = "okay";
 	};
 	
@@ -411,5 +411,14 @@
                 output-high;
                 line-name = "sd-pwren";
         };
+};
+
+&gpio2 {
+	wlan-reg-en {
+                gpio-hog;
+                gpios = <RK_PB1 GPIO_ACTIVE_HIGH>;
+                output-high;
+                line-name = "wlan-reg-en";
+	};
 };
 
