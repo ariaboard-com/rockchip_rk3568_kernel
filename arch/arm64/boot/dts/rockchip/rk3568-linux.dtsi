@@ -6,7 +6,7 @@
 
 / {
 	chosen: chosen {
-		bootargs = "earlycon=uart8250,mmio32,0xfe660000 console=ttyFIQ0 root=/dev/mmcblk0p6 rootfstype=ext4 rw rootwait coherent_pool=1m systemd.gpt_auto=0 cgroup_enable=memory swapaccount=1";
+		bootargs = "earlycon=uart8250,mmio32,0xfe660000 console=ttyFIQ0 rootfstype=ext4 rw rootwait coherent_pool=1m systemd.gpt_auto=0 cgroup_enable=memory swapaccount=1";
 		/* mmcblk0p6: eMMC rootfs, mmcblk1p1: SD rootfs */
 	};
 
