@@ -9,7 +9,6 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/pinctrl/rockchip.h>
 #include "rk3568-firefly-core.dtsi"
-#include "rk3568-linux.dtsi"
 
 / {
 	compatible = "rockchip,rk3568-firefly-port", "rockchip,rk3568";
@@ -640,3 +639,5 @@
     assigned-clock-rates = <50000000>;
     status = "okay";
 };
+
+#include "rk3568-linux.dtsi"
