@@ -422,3 +422,6 @@
 	};
 };
 
+&crypto {
+	status = "okay";
+};
