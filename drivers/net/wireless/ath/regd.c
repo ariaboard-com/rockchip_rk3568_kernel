@@ -345,6 +345,10 @@ ath_reg_apply_beaconing_flags(struct wiphy *wiphy,
 	struct ieee80211_channel *ch;
 	unsigned int i;
 
+	#ifdef CONFIG_ATH_USER_REGD
+		return;
+	#endif
+
 	for (band = 0; band < NUM_NL80211_BANDS; band++) {
 		if (!wiphy->bands[band])
 			continue;
@@ -378,6 +382,10 @@ ath_reg_apply_ir_flags(struct wiphy *wiphy,
 {
 	struct ieee80211_supported_band *sband;
 
+	#ifdef CONFIG_ATH_USER_REGD
+		return;
+	#endif
+
 	sband = wiphy->bands[NL80211_BAND_2GHZ];
 	if (!sband)
 		return;
@@ -406,6 +414,10 @@ static void ath_reg_apply_radar_flags(struct wiphy *wiphy,
 	struct ieee80211_supported_band *sband;
 	struct ieee80211_channel *ch;
 	unsigned int i;
+
+	#ifdef CONFIG_ATH_USER_REGD
+		return;
+	#endif
 
 	if (!wiphy->bands[NL80211_BAND_5GHZ])
 		return;
@@ -639,6 +651,11 @@ ath_regd_init_wiphy(struct ath_regulatory *reg,
 	const struct ieee80211_regdomain *regd;
 
 	wiphy->reg_notifier = reg_notifier;
+	
+	#ifdef CONFIG_ATH_USER_REGD
+		return 0;
+	#endif
+	
 	wiphy->regulatory_flags |= REGULATORY_STRICT_REG |
 				   REGULATORY_CUSTOM_REG;
 
