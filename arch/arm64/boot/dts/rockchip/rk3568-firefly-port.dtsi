@@ -9,6 +9,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/pinctrl/rockchip.h>
 #include "rk3568-firefly-core.dtsi"
+#include "rk3568-linux.dtsi"
 
 / {
 	compatible = "rockchip,rk3568-firefly-port", "rockchip,rk3568";
@@ -43,14 +44,6 @@
 			linux,code = <KEY_BACK>;
 			press-threshold-microvolt = <1305500>;
 		};
-	};
-
-	rk_headset: rk-headset {
-		status = "disabled";
-		compatible = "rockchip_headset";
-		headset_gpio = <&gpio3 RK_PC2 GPIO_ACTIVE_LOW>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&hp_det>;
 	};
 
 	vcc2v5_sys: vcc2v5-ddr {
@@ -450,6 +443,10 @@
 	status = "disabled";
 };
 
+&rk809_sound {
+	/delete-property/ simple-audio-card,hp-det-gpio;
+};
+
 &rkisp {
 	status = "okay";
 };
@@ -640,4 +637,3 @@
     status = "okay";
 };
 
-#include "rk3568-linux.dtsi"

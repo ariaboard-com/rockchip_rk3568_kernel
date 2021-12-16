@@ -57,6 +57,14 @@
 		};
 	};
 
+	rk_headset: rk-headset {
+		status = "disabled";
+		compatible = "rockchip_headset";
+		headset_gpio = <&gpio3 RK_PC2 GPIO_ACTIVE_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&hp_det>;
+	};
+
 	pdmics: dummy-codec {
 		status = "disabled";
 		compatible = "rockchip,dummy-codec";
