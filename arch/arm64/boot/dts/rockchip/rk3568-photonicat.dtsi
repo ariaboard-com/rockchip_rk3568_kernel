@@ -382,19 +382,31 @@
 
 
 &pinctrl {
-    tf {
-        /omit-if-no-ref/
-        sdmmc0_det1: sdmmc0-det1 {
-            rockchip,pins =
-                /* sdmmc0_det */
-                <0 RK_PB5 RK_FUNC_GPIO &pcfg_pull_up>;
-        };
-    };
+	tf {
+		/omit-if-no-ref/
+		sdmmc0_det1: sdmmc0-det1 {
+			rockchip,pins =
+			/* sdmmc0_det */
+			<0 RK_PB5 RK_FUNC_GPIO &pcfg_pull_up>;
+		};
+	};
 };
 
 &uart1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&uart1m0_xfer &uart1m0_ctsn &uart1m0_rtsn>;
+	status = "okay";
+};
+
+&uart3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart3m0_xfer>;
+	status = "okay";
+};
+
+&uart4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart4m0_xfer>;
 	status = "okay";
 };
 
