@@ -447,6 +447,10 @@
 	/delete-property/ simple-audio-card,hp-det-gpio;
 };
 
+&rk809_codec {
+	pinctrl-0 = <&i2s1m0_mclk>;
+};
+
 &rkisp {
 	status = "okay";
 };
