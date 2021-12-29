@@ -6,7 +6,7 @@
 
 / {
 	chosen: chosen {
-		bootargs = "earlycon=uart8250,mmio32,0xfe660000 console=ttyFIQ0 rootfstype=ext4 rw rootwait coherent_pool=1m systemd.gpt_auto=0 cgroup_enable=memory swapaccount=1 consoleblank=0 video=HDMI-A-1:1920x1080@60e";
+		bootargs = "earlycon=uart8250,mmio32,0xfe660000 console=ttyFIQ0 rootfstype=ext4 rw rootwait coherent_pool=1m systemd.gpt_auto=0 cgroup_enable=memory swapaccount=1 consoleblank=0 video=HDMI-A-1:e";
 		/* mmcblk0p6: eMMC rootfs, mmcblk1p1: SD rootfs */
 	};
 
