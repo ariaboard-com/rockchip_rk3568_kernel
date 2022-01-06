@@ -443,3 +443,12 @@
 &crypto {
 	status = "okay";
 };
+
+&gpio4 {
+	aux-pwren {
+		gpio-hog;
+		gpios = <RK_PD2 GPIO_ACTIVE_HIGH>;
+		output-high;
+		line-name = "aux-pwren";
+        };
+};
