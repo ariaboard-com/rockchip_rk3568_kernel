@@ -922,6 +922,15 @@ config VIDEO_OS08A20
 	  This is a Video4Linux2 sensor driver for the OmniVision
 	  OS08A20 camera.
 
+config VIDEO_OS12D40
+	tristate "OmniVision OS12D40 sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  This is a Video4Linux2 sensor driver for the OmniVision
+	  OS12D40 camera.
+
 config VIDEO_OV02B10
 	tristate "OmniVision OV02B10 sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
@@ -1488,6 +1497,17 @@ config VIDEO_GC02M2
 	  To compile this driver as a module, choose M here: the
 	  module will be called gc02m2.
 
+config VIDEO_GC030A
+	tristate "GalaxyCore GC030A sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  Support for the GalaxyCore GC030A sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called gc030A.
+
 config VIDEO_GC0312
 	tristate "GalaxyCore GC0312 sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
@@ -1531,6 +1551,17 @@ config VIDEO_GC0403
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called gc0403.
+
+config VIDEO_GC1054
+	tristate "GalaxyCore GC1054 sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  Support for the GalaxyCore GC1054 sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called gc1054.
 
 config VIDEO_GC2035
 	tristate "GalaxyCore GC2035 sensor support"
@@ -1708,6 +1739,17 @@ config VIDEO_JX_F37
 	  To compile this driver as a module, choose M here: the
 	  module will be called jx_f37.
 
+config VIDEO_JX_F37P
+	tristate "SOI JX_F37P sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  Support for the SOI JX_F37P sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called jx_f37p.
+
 config VIDEO_JX_H62
 	tristate "SOI JX_H62 sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
@@ -1762,6 +1804,17 @@ config VIDEO_SC035HGS
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called sc035hgs.
+
+config VIDEO_SC1330
+	tristate "SmartSens SC1330 sensor support"
+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	help
+	  Support for the SmartSens SC1330 sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called SC1330.
 
 config VIDEO_SC132GS
 	tristate "SmartSens SC132GS sensor support"

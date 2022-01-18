@@ -1228,6 +1228,7 @@ static enum vop2_afbc_format vop2_convert_afbc_format(uint32_t format)
 	case DRM_FORMAT_NV12_10:
 		return VOP2_AFBC_FMT_YUV420_10BIT;
 	case DRM_FORMAT_NV16:
+	case DRM_FORMAT_YUYV:
 		return VOP2_AFBC_FMT_YUV422;
 	case DRM_FORMAT_NV16_10:
 		return VOP2_AFBC_FMT_YUV422_10BIT;
@@ -1295,6 +1296,7 @@ static bool vop2_afbc_uv_swap(uint32_t format)
 	switch (format) {
 	case DRM_FORMAT_NV12:
 	case DRM_FORMAT_NV16:
+	case DRM_FORMAT_YUYV:
 	case DRM_FORMAT_NV12_10:
 	case DRM_FORMAT_NV16_10:
 		return true;
@@ -6216,8 +6218,10 @@ static int vop2_create_crtc(struct vop2 *vop2)
 
 		if (vp->primary_plane_phy_id >= 0) {
 			win = vop2_find_win_by_phys_id(vop2, vp->primary_plane_phy_id);
-			if (win)
+			if (win) {
 				find_primary_plane = true;
+				win->type = DRM_PLANE_TYPE_PRIMARY;
+			}
 		} else {
 			while (j < vop2->registered_num_wins) {
 				be_used_for_primary_plane = false;
