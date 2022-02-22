@@ -184,7 +184,6 @@
 
 &sdmmc2 {
 	status = "okay";
-	max-frequency = <100000000>;
 };
 
 &wireless_wlan {
