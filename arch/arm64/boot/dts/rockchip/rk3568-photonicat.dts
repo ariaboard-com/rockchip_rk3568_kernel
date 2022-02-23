@@ -12,7 +12,7 @@
 / {
 	model = "Rockchip RK3568 PhotoniCat Linux Board";
 	compatible = "rockchip,rk3568-photonicat", "rockchip,rk3568";
-	
+/*	
 	reserved-memory {
 		#address-cells = <2>;
 		#size-cells = <2>;
@@ -26,16 +26,17 @@
 			alignment = <0x0 0x1000>;
 		};
 	};
+*/
 };
 
 &rknpu {
 	memory-region = <&rknpu_reserved>;
 	rknpu-supply = <&vdd_npu>;
 
-	status = "okay";
+	status = "disabled";
 };
 
 &rknpu_mmu {
-	status = "okay";
+	status = "disabled";
 };
 
