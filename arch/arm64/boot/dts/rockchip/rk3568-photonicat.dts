@@ -30,9 +30,10 @@
 };
 
 &rknpu {
+/*
 	memory-region = <&rknpu_reserved>;
 	rknpu-supply = <&vdd_npu>;
-
+*/
 	status = "disabled";
 };
 
