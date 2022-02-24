@@ -10,7 +10,7 @@
 #include "rk3568-linux.dtsi"
 
 / {
-	model = "Rockchip RK3568 PhotoniCat Linux Board";
+	model = "Rockchip RK3568 photonicat Linux Board";
 	compatible = "rockchip,rk3568-photonicat", "rockchip,rk3568";
 /*	
 	reserved-memory {
