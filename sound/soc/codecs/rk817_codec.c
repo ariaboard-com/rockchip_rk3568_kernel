@@ -269,14 +269,14 @@ static int rk817_codec_ctl_gpio(struct rk817_codec_priv *rk817,
 {
 	if ((gpio & CODEC_SET_SPK) &&
 	    rk817->spk_ctl_gpio) {
-		gpiod_set_value(rk817->spk_ctl_gpio, level);
+		gpiod_set_value_cansleep(rk817->spk_ctl_gpio, level);
 		DBG("%s set spk clt %d\n", __func__, level);
 		msleep(rk817->spk_mute_delay);
 	}
 
 	if ((gpio & CODEC_SET_HP) &&
 	    rk817->hp_ctl_gpio) {
-		gpiod_set_value(rk817->hp_ctl_gpio, level);
+		gpiod_set_value_cansleep(rk817->hp_ctl_gpio, level);
 		DBG("%s set hp clt %d\n", __func__, level);
 		msleep(rk817->hp_mute_delay);
 	}
