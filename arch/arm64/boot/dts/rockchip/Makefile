@@ -111,3 +111,6 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-nvr-demo-v10-linux.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-nvr-demo-v10-linux-spi-nand.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-nvr-demo-v12-linux.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-nvr-demo-v12-linux-spi-nand.dtb
+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-firefly-iboard-3568q.dtb
+#dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-firefly-itx-3568jq-lvds101_HSX101H40C.dtb
+#dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-firefly-itx-3568jq-mipi101_M101014_BE45_A1.dtb
