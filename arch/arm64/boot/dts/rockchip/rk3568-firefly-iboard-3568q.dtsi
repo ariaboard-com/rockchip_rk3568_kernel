@@ -255,8 +255,8 @@
     status = "okay";
     tx_delay = <0x39>;
     rx_delay = <0x2c>;
-//	snps,reset-gpio = <&gpio0 RK_PD5 GPIO_ACTIVE_LOW>;
-	//snps,reset-gpio = <&gpio3 RK_PB6 GPIO_ACTIVE_LOW>;
+	snps,reset-gpio = <&gpio0 RK_PD5 GPIO_ACTIVE_LOW>;
+//	snps,reset-gpio = <&gpio2 RK_PD3 GPIO_ACTIVE_LOW>;
 };
 
 &gmac1 {
