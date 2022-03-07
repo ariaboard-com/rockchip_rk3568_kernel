@@ -242,11 +242,11 @@
 };
 
 &can1 {
-    status = "okay";
+    status = "disabled";
 };
 
 &can2 {
-    status = "okay";
+    status = "disabled";
 };
 
 /delete-node/ &vcc3v3_vga;
