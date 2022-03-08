@@ -208,6 +208,10 @@
 	status = "okay";
 };
 
+&uart0 {
+	status = "okay";
+};
+
 &spi1 {
 	status = "okay";
 };
