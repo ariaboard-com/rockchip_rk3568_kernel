@@ -203,7 +203,7 @@
 
 &dmc {
 	center-supply = <&vdd_logic>;
-	status = "disabled";
+	status = "okay";
 };
 
 &gpu {
