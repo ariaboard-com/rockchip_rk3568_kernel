@@ -336,14 +336,6 @@
 	status = "okay";
 };
 
-&dfi {
-	status = "okay";
-};
-
-&dmc {
-	status = "okay";
-};
-
 &pinctrl {
 
 	leds {
