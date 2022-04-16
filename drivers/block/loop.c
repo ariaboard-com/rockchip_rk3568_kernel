@@ -2161,7 +2161,7 @@ static int loop_add(struct loop_device **l, int i)
 		sprintf(disk->disk_name, "mmcblkloop");
 		virtual_part = 0;
 	} else if (shared_part){
-		sprintf(disk->disk_name, "mmcblkshared");
+		sprintf(disk->disk_name, "mmcblkshared1");
 		shared_part = 0;
 	} else {
 		sprintf(disk->disk_name, "loop%d", i);
