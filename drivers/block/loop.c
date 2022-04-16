@@ -85,6 +85,30 @@
 static DEFINE_IDR(loop_index_idr);
 static DEFINE_MUTEX(loop_ctl_mutex);
 
+static int virtual_part = 0;
+static int shared_part = 0;
+static int __init
+virtual_partition_lba(char *str)
+{
+	u64 lba_count = 0;
+	lba_count = simple_strtoull(str, &str, 10);
+	if (lba_count != 0)
+		virtual_part = 1;
+	return 1;
+}
+__setup("virtual_lba_count=", virtual_partition_lba);
+
+static int __init
+shared_partition_lba(char *str)
+{
+	u64 lba_count = 0;
+	lba_count = simple_strtoull(str, &str, 10);
+	if (lba_count != 0)
+		shared_part = 1;
+	return 1;
+}
+__setup("shared_lba_count=", shared_partition_lba);
+
 static int max_part;
 static int part_shift;
 
@@ -2052,17 +2076,20 @@ static int loop_add(struct loop_device **l, int i)
 
 	lo->lo_state = Lo_unbound;
 
-	/* allocate id, if @id >= 0, we're requesting that specific id */
-	if (i >= 0) {
-		err = idr_alloc(&loop_index_idr, lo, i, i + 1, GFP_KERNEL);
-		if (err == -ENOSPC)
-			err = -EEXIST;
-	} else {
-		err = idr_alloc(&loop_index_idr, lo, 0, 0, GFP_KERNEL);
+	/*Virtual disks can only be found by name*/
+	if (!virtual_part && !shared_part) {
+		/* allocate id, if @id >= 0, we're requesting that specific id */
+		if (i >= 0) {
+			err = idr_alloc(&loop_index_idr, lo, i, i + 1, GFP_KERNEL);
+			if (err == -ENOSPC)
+				err = -EEXIST;
+		} else {
+			err = idr_alloc(&loop_index_idr, lo, 0, 0, GFP_KERNEL);
+		}
+		if (err < 0)
+			goto out_free_dev;
+		i = err;
 	}
-	if (err < 0)
-		goto out_free_dev;
-	i = err;
 
 	err = -ENOMEM;
 	lo->tag_set.ops = &loop_mq_ops;
@@ -2128,7 +2155,15 @@ static int loop_add(struct loop_device **l, int i)
 	disk->fops		= &lo_fops;
 	disk->private_data	= lo;
 	disk->queue		= lo->lo_queue;
-	sprintf(disk->disk_name, "loop%d", i);
+	if (virtual_part) {
+		sprintf(disk->disk_name, "mmcblkloop");
+		virtual_part = 0;
+	} else if (shared_part){
+		sprintf(disk->disk_name, "mmcblkshared");
+		shared_part = 0;
+	} else {
+		sprintf(disk->disk_name, "loop%d", i);
+	}
 	add_disk(disk);
 	*l = lo;
 	return lo->lo_number;
@@ -2337,6 +2372,10 @@ static int __init loop_init(void)
 	blk_register_region(MKDEV(LOOP_MAJOR, 0), range,
 				  THIS_MODULE, loop_probe, NULL, NULL);
 
+	if (nr < 2) {
+		virtual_part = 0;
+		shared_part = 0;
+	}
 	/* pre-create number of devices given by config or max_loop */
 	mutex_lock(&loop_ctl_mutex);
 	for (i = 0; i < nr; i++)
