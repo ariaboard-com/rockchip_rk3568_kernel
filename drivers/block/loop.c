@@ -85,8 +85,9 @@
 static DEFINE_IDR(loop_index_idr);
 static DEFINE_MUTEX(loop_ctl_mutex);
 
-static int virtual_part = 0;
-static int shared_part = 0;
+static int virtual_part;
+static int shared_part;
+#ifdef CONFIG_BLK_DEV_LOOP_VIRTUAL_DISK
 static int __init
 virtual_partition_lba(char *str)
 {
@@ -108,6 +109,7 @@ shared_partition_lba(char *str)
 	return 1;
 }
 __setup("shared_lba_count=", shared_partition_lba);
+#endif
 
 static int max_part;
 static int part_shift;
@@ -2371,11 +2373,12 @@ static int __init loop_init(void)
 
 	blk_register_region(MKDEV(LOOP_MAJOR, 0), range,
 				  THIS_MODULE, loop_probe, NULL, NULL);
-
+#ifdef CONFIG_BLK_DEV_LOOP_VIRTUAL_DISK
 	if (nr < 2) {
 		virtual_part = 0;
 		shared_part = 0;
 	}
+#endif
 	/* pre-create number of devices given by config or max_loop */
 	mutex_lock(&loop_ctl_mutex);
 	for (i = 0; i < nr; i++)
