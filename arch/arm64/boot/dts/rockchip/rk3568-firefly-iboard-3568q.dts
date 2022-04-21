@@ -37,7 +37,7 @@
 };
 
 &can1 {
-    status = "disabled";
+    status = "okay";
 };
 
 &can2 {
