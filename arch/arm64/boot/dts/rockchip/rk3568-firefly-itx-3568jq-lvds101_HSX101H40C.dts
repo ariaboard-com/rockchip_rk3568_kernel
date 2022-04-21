@@ -184,7 +184,7 @@
         screen_max_x = <800>;
         screen_max_y = <1280>;
         touch-gpio = <&gpio0 RK_PC7 IRQ_TYPE_LEVEL_LOW>;
-        reset-gpio = <&pca9555 PCA_IO0_4 GPIO_ACTIVE_HIGH>;
+        reset-gpio = <&pca9555 PCA_IO1_0 GPIO_ACTIVE_HIGH>;
         flip-x = <1>;
         flip-y = <0>;
         swap-xy = <0>;
