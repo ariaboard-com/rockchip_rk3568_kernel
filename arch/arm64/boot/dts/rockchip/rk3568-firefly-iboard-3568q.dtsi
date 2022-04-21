@@ -66,7 +66,7 @@
 			label = "firefly:fan_ctl:user";
 			linux,default-trigger = "ir-user-click";
 			default-state = "on";
-			gpios = <&gpio4 RK_PD2 GPIO_ACTIVE_HIGH>;
+			gpios = <&pca9555_1 PCA_IO0_7 GPIO_ACTIVE_HIGH>;
 		};
 	};
 
@@ -80,16 +80,16 @@
 //		regulator-always-on;
 //	};
 
-	pcie20_3v3: gpio-regulator {
-		compatible = "regulator-gpio";
-		regulator-name = "pcie20_3v3";
-		regulator-min-microvolt = <0100000>;
-		regulator-max-microvolt = <3300000>;
-		gpios = <&pca9555 PCA_IO0_2 GPIO_ACTIVE_HIGH>;
-		gpios-states = <0x1>;
-		states = <0100000 0x0
-			  3300000 0x1>;
-	};
+//	pcie20_3v3: gpio-regulator {
+//		compatible = "regulator-gpio";
+//		regulator-name = "pcie20_3v3";
+//		regulator-min-microvolt = <0100000>;
+//		regulator-max-microvolt = <3300000>;
+//		gpios = <&pca9555 PCA_IO0_2 GPIO_ACTIVE_HIGH>;
+//		gpios-states = <0x1>;
+//		states = <0100000 0x0
+//			  3300000 0x1>;
+//	};
 };
 
 &vcc5v0_host {
@@ -152,6 +152,14 @@
 		/* rtc_int is not connected */
 	};
 
+	pca9555_1: gpio@22 {
+		status = "okay";
+		compatible = "nxp,pca9555";
+		reg = <0x22>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		gpio-group-num = <500>;
+	};
 
     gslx680: gslx680@41 {
         status = "disabled";
@@ -246,7 +254,7 @@
 };
 
 &can1 {
-    status = "disabled";
+    status = "okay";
 };
 
 &can2 {
@@ -311,7 +319,7 @@
 &rk809_codec {
     spk-ctl-gpios = <&pca9555 PCA_IO0_7 GPIO_ACTIVE_HIGH>;
 	/delete-property/ pinctrl-1;
-    hp-ctl-gpios = <&gpio2 RK_PC1 GPIO_ACTIVE_LOW>;
+    hp-ctl-gpios = <&gpio2 RK_PC1 GPIO_ACTIVE_HIGH>;
     hp-det-adc-value = <200>;
     hp-adc-drift-scope = <200>;
 };
@@ -332,8 +340,16 @@
 };
 
 &pcie2x1 {
-	reset = <&pca9555 PCA_IO0_2 GPIO_ACTIVE_HIGH>;
+	reset = <&pca9555_1 PCA_IO0_6 GPIO_ACTIVE_HIGH>;
 	status = "okay";
+};
+
+&dfi {
+       status = "okay";
+};
+
+&dmc {
+       status = "okay";
 };
 
 &pinctrl {
