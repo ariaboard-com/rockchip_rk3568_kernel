@@ -76,8 +76,9 @@
         pinctrl-0 = <&cif_clk>;
 
         //power-gpios = <&pca9555 PCA_IO0_4 GPIO_ACTIVE_HIGH>;
-        reset-gpios = <&pca9555 PCA_IO1_7 GPIO_ACTIVE_HIGH>;
-        pwdn-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_HIGH>;
+        reset-gpios = <&pca9555_1 PCA_IO0_2 GPIO_ACTIVE_HIGH>;
+        //pwdn-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_HIGH>;
+		pwdn-gpios = <&pca9555_1 PCA_IO0_4 GPIO_ACTIVE_HIGH>;
 
         firefly,clkout-enabled-index = <0>;
         rockchip,camera-module-index = <0>;
