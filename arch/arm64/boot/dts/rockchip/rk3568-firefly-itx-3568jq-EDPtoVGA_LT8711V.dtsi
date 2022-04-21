@@ -17,7 +17,7 @@
 
 	vcc3v3_vga_rst: vcc3v3-vga-rst {
 		compatible = "regulator-fixed";
-		gpio =  <&pca9555 PCA_IO1_0 GPIO_ACTIVE_HIGH>;
+		gpio =  <&pca9555 PCA_IO0_4 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 		regulator-name = "vcc3v3_vga_rst";
 		regulator-always-on;
