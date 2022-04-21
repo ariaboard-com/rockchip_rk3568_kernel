@@ -7,7 +7,7 @@
 /dts-v1/;
 
 #include "rk3568-firefly-iboard-3568q.dtsi"
-
+#include "rk3568-firefly-iboard-3568q-cam-8ms1m.dtsi"
 / {
     model = "ITX-3568JQ MIPI M101014-BE45-A1 + HDMI(Linux)";
     compatible = "rockchip,rk3568-firefly-itx-3568jq-mipi", "rockchip,rk3568";
