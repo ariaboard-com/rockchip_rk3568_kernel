@@ -194,8 +194,8 @@
 		pinctrl-0 = <&refclk_pins>;
 
 		//power-gpios = <&pca9555 PCA_IO0_3 GPIO_ACTIVE_HIGH>; //IR_PWR_EN
-		power-gpios = <&pca9555 PCA_IO1_7 GPIO_ACTIVE_HIGH>; //IR_PWR_EN
-		pwdn-gpios = <&gpio4 RK_PB5 GPIO_ACTIVE_LOW>;
+		power-gpios = <&pca9555_1 PCA_IO0_2 GPIO_ACTIVE_HIGH>; //IR_PWR_EN
+		pwdn-gpios = <&pca9555_1 PCA_IO0_3 GPIO_ACTIVE_LOW>;
 
 		firefly,clkout-enabled-index = <1>;
 		rockchip,camera-module-index = <0>;
@@ -223,7 +223,7 @@
 		//pinctrl-0 = <&refclk_pins>;
 		flash-leds = <&flash_led>;
 
-		pwdn-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_HIGH>;
+		pwdn-gpios = <&pca9555_1 PCA_IO0_4 GPIO_ACTIVE_HIGH>;
 
 		firefly,clkout-enabled-index = <0>;
 		rockchip,camera-module-index = <1>;
@@ -245,7 +245,9 @@
 
 &vcc_camera {
 	status = "okay";
-	gpio = <&pca9555 PCA_IO0_6 GPIO_ACTIVE_HIGH>;
+	gpio = <&pca9555_1 PCA_IO0_1 GPIO_ACTIVE_HIGH>;
+	/delete-property/ pinctrl-names;
+	/delete-property/ pinctrl-0;
 };
 
 &pwm11 {
