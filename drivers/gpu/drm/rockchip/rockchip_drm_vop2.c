@@ -416,6 +416,9 @@ struct vop2_video_port {
 	uint8_t id;
 	bool layer_sel_update;
 	const struct vop2_video_port_regs *regs;
+	bool rg_swap;
+	bool rb_swap;
+	bool bg_swap;
 
 	struct completion dsp_hold_completion;
 	struct completion line_flag_completion;
@@ -4419,7 +4422,7 @@ static void vop2_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state
 	if (vop2_output_uv_swap(vcstate->bus_format, vcstate->output_mode))
 		VOP_MODULE_SET(vop2, vp, dsp_data_swap, DSP_RB_SWAP);
 	else
-		VOP_MODULE_SET(vop2, vp, dsp_data_swap, 0);
+		VOP_MODULE_SET(vop2, vp, dsp_data_swap, vop2->vps[vp->id].bg_swap << 0 | vop2->vps[vp->id].rb_swap << 1 | vop2->vps[vp->id].rg_swap << 2);
 
 	vop2_dither_setup(crtc);
 
@@ -6594,6 +6597,10 @@ static int vop2_bind(struct device *dev, struct device *master, void *data)
 			of_property_read_u32(child, "rockchip,plane-mask", &plane_mask);
 			of_property_read_u32(child, "rockchip,primary-plane", &primary_plane_phy_id);
 			of_property_read_u32(child, "reg", &vp_id);
+			
+			vop2->vps[vp_id].rg_swap = of_property_read_bool(child, "rg-swap");
+			vop2->vps[vp_id].rb_swap = of_property_read_bool(child, "rb-swap");
+			vop2->vps[vp_id].bg_swap = of_property_read_bool(child, "bg-swap");
 
 			vop2->vps[vp_id].plane_mask = plane_mask;
 			if (plane_mask)
