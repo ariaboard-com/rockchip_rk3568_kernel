@@ -105,6 +105,7 @@
 };
 
 &vp2{
+	rgb-pixelclk;
 	rb-swap;
 };
 
