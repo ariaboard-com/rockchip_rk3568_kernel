@@ -419,6 +419,7 @@ struct vop2_video_port {
 	bool rg_swap;
 	bool rb_swap;
 	bool bg_swap;
+	bool rgb_pixelclk;
 
 	struct completion dsp_hold_completion;
 	struct completion line_flag_completion;
@@ -4304,6 +4305,11 @@ static void vop2_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state
 	val |= (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC) ? 0 : BIT(VSYNC_POSITIVE);
 
 	if (vcstate->output_if & VOP_OUTPUT_IF_RGB) {
+		if(vop2->vps[vp->id].rgb_pixelclk){
+			dclk_inv = vop2->vps[vp->id].rgb_pixelclk;
+			printk("dclk_inv : %d\n",dclk_inv);
+		}
+
 		VOP_CTRL_SET(vop2, rgb_en, 1);
 		VOP_CTRL_SET(vop2, rgb_mux, vp_data->id);
 		VOP_GRF_SET(vop2, grf_dclk_inv, dclk_inv);
@@ -6601,6 +6607,8 @@ static int vop2_bind(struct device *dev, struct device *master, void *data)
 			vop2->vps[vp_id].rg_swap = of_property_read_bool(child, "rg-swap");
 			vop2->vps[vp_id].rb_swap = of_property_read_bool(child, "rb-swap");
 			vop2->vps[vp_id].bg_swap = of_property_read_bool(child, "bg-swap");
+			vop2->vps[vp_id].rgb_pixelclk = of_property_read_bool(child, "rgb-pixelclk");
+			printk("vp%d: rgb_pixelclk: %d\n", vp_id, vop2->vps[vp_id].rgb_pixelclk);
 
 			vop2->vps[vp_id].plane_mask = plane_mask;
 			if (plane_mask)
