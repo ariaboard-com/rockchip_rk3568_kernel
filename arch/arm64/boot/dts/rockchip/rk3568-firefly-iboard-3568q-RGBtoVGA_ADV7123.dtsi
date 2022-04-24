@@ -10,14 +10,14 @@
 	rgb0_panel {
 			status = "okay";
 			compatible = "simple-panel";
-			ddc-i2c-bus = <&i2c1>;
+			ddc-i2c-bus = <&i2c2>;
 			//enable-gpios =<&pca9555 PCA_IO0_1 GPIO_ACTIVE_HIGH>;
 			reset-gpios = <&pca9555 PCA_IO0_5 GPIO_ACTIVE_LOW>;
 			/*	bus-format. default RGB for D23-D16/D15-8/D7-D0. 
 			        MEDIA_BUS_FMT_RGB888_1X24,  0x100a
 					MEDIA_BUS_FMT_BGR888_1X24,  0x1013
 			*/
-			bus-format = < 0x1013>;
+//			bus-format = < 0x1013>;
 
 			/*
 				name              refresh     xres    yres    pixclock            h_bp    h_fp    v_bp    v_fp    h_pw    v_pw    polariry    PorI    flag(used for vic)
@@ -32,7 +32,7 @@
 				{"1680x1050p@60Hz", 60,         1680,   1050,   146200000,  280,    104,    30,     3,      176,    6,      FB_SYNC_VERT_HIGH_ACT,          0,      0   },
 				{"1920x1080p@60Hz", 60,         1920,   1080,   148500000,  148,    88,     36,     4,       44,    5,      FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,           0,      0       },
 			*/
-			rgb_timings0: display-timings {
+/*			rgb_timings0: display-timings {
 				native-mode = <&rgb0_timing0>;
 				rgb0_timing0: timing0 {
 					hactive = <1920>;
@@ -50,7 +50,7 @@
 					pixelclk-active = <0>;
 				};
 			};
-
+*/
 			port {
 				vga_in: endpoint {
 					remote-endpoint = <&rgb_out>;
