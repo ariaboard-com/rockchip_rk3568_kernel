@@ -681,7 +681,10 @@ static void analogix_dp_get_max_rx_bandwidth(struct analogix_dp_device *dp,
 	 * 0x06 = 1.62 Gbps, 0x0a = 2.7 Gbps, 0x14 = 5.4Gbps
 	 */
 	drm_dp_dpcd_readb(&dp->aux, DP_MAX_LINK_RATE, &data);
-	*bandwidth = data;
+	if(0x14 == data)
+		*bandwidth = 0x0a;
+	else
+		*bandwidth = data;
 }
 
 static void analogix_dp_get_max_rx_lane_count(struct analogix_dp_device *dp,
