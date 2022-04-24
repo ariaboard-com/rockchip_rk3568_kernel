@@ -19,6 +19,7 @@
 #define EBC_FB_SIZE		0x200000 /* 2M */
 #define EINK_FB_SIZE		0x400000 /* 4M */
 #define DIRECT_FB_SIZE		0x100000 /* 1M */
+#define LUT_TABLE_SIZE		0x1000000 /* 16M */
 
 #define MAX_FB_NUM		4
 
@@ -53,6 +54,9 @@
 #define EBC_GET_AUTO_NEW_BUFFER (0x7009)
 #define EBC_GET_AUTO_BG_BUFFER (0x700a)
 #define EBC_GET_AUTO_CUR_BUFFER (0x700b)
+//debug end
+#define EBC_GET_DSP_BUF_NUM	(0x700c)
+#define EBC_SET_DIFF_PERCENT	(0x700d)
 
 /*
  * IMPORTANT: Those values is corresponding to android hardware program,

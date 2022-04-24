@@ -51,6 +51,8 @@
 #include "regs.h"
 #include "rkisp_tb_helper.h"
 
+#define ISP_V4L2_EVENT_ELEMS 4
+
 #define ISP_SUBDEV_NAME DRIVER_NAME "-isp-subdev"
 /*
  * NOTE: MIPI controller and input MUX are also configured in this file,
@@ -536,11 +538,8 @@ void rkisp_trigger_read_back(struct rkisp_device *dev, u8 dma2frm, u32 mode, boo
 	}
 	dev->rd_mode = rd_mode;
 
-	/* configure hdr params in rdbk mode */
-	if (is_upd || cur_frame_id == 0)
-		rkisp_params_first_cfg(&dev->params_vdev,
-				       &dev->isp_sdev.in_fmt,
-				       dev->isp_sdev.quantization);
+	rkisp_params_first_cfg(&dev->params_vdev, &dev->isp_sdev.in_fmt,
+			       dev->isp_sdev.quantization);
 	rkisp_params_cfg(params_vdev, cur_frame_id);
 
 	if (!hw->is_single && !is_try) {
@@ -648,8 +647,7 @@ static void rkisp_rdbk_trigger_handle(struct rkisp_device *dev, u32 cmd)
 
 	if (max) {
 		v4l2_dbg(2, rkisp_debug, &dev->v4l2_dev,
-			 "handle isp%d, trigger fifo len:%d\n",
-			 id, max);
+			 "trigger fifo len:%d\n", max);
 		isp = hw->isp[id];
 		rkisp_rdbk_trigger_event(isp, T_CMD_DEQUEUE, &t);
 		isp->dmarx_dev.pre_frame = isp->dmarx_dev.cur_frame;
@@ -2233,7 +2231,7 @@ static void rkisp_global_update_mi(struct rkisp_device *dev)
 	if (dev->hw_dev->is_single) {
 		for (i = 0; i < RKISP_MAX_STREAM; i++) {
 			stream = &dev->cap_dev.stream[i];
-			if (stream->streaming && !stream->next_buf)
+			if (stream->streaming)
 				stream->ops->frame_end(stream);
 		}
 	}
@@ -2467,7 +2465,7 @@ static int rkisp_isp_sd_subs_evt(struct v4l2_subdev *sd, struct v4l2_fh *fh,
 	if (sub->id != 0)
 		return -EINVAL;
 
-	return v4l2_event_subscribe(fh, sub, 0, NULL);
+	return v4l2_event_subscribe(fh, sub, ISP_V4L2_EVENT_ELEMS, NULL);
 }
 
 static long rkisp_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
@@ -2475,8 +2473,6 @@ static long rkisp_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	struct rkisp_device *isp_dev = sd_to_isp_dev(sd);
 	struct rkisp_thunderboot_resmem *resmem;
 	struct rkisp_thunderboot_resmem_head *head;
-	struct rkisp_ldchbuf_info *ldchbuf;
-	struct rkisp_ldchbuf_size *ldchsize;
 	struct rkisp_thunderboot_shmem *shmem;
 	struct isp2x_buf_idxfd *idxfd;
 	void *resmem_va;
@@ -2532,12 +2528,12 @@ static long rkisp_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		isp_dev->resmem_size = 0;
 		break;
 	case RKISP_CMD_GET_LDCHBUF_INFO:
-		ldchbuf = (struct rkisp_ldchbuf_info *)arg;
-		rkisp_params_get_ldchbuf_inf(&isp_dev->params_vdev, ldchbuf);
+	case RKISP_CMD_GET_MESHBUF_INFO:
+		rkisp_params_get_meshbuf_inf(&isp_dev->params_vdev, arg);
 		break;
 	case RKISP_CMD_SET_LDCHBUF_SIZE:
-		ldchsize = (struct rkisp_ldchbuf_size *)arg;
-		rkisp_params_set_ldchbuf_size(&isp_dev->params_vdev, ldchsize);
+	case RKISP_CMD_SET_MESHBUF_SIZE:
+		rkisp_params_set_meshbuf_size(&isp_dev->params_vdev, arg);
 		break;
 	case RKISP_CMD_GET_SHM_BUFFD:
 		shmem = (struct rkisp_thunderboot_shmem *)arg;
@@ -2563,6 +2559,8 @@ static long rkisp_compat_ioctl32(struct v4l2_subdev *sd,
 	struct rkisp_thunderboot_resmem resmem;
 	struct rkisp_ldchbuf_info ldchbuf;
 	struct rkisp_ldchbuf_size ldchsize;
+	struct rkisp_meshbuf_info meshbuf;
+	struct rkisp_meshbuf_size meshsize;
 	struct rkisp_thunderboot_shmem shmem;
 	struct isp2x_buf_idxfd idxfd;
 	long ret = 0;
@@ -2593,6 +2591,18 @@ static long rkisp_compat_ioctl32(struct v4l2_subdev *sd,
 		if (copy_from_user(&ldchsize, up, sizeof(ldchsize)))
 			return -EFAULT;
 		ret = rkisp_ioctl(sd, cmd, &ldchsize);
+		break;
+	case RKISP_CMD_GET_MESHBUF_INFO:
+		if (copy_from_user(&meshsize, up, sizeof(meshsize)))
+			return -EFAULT;
+		ret = rkisp_ioctl(sd, cmd, &meshbuf);
+		if (!ret && copy_to_user(up, &meshbuf, sizeof(meshbuf)))
+			ret = -EFAULT;
+		break;
+	case RKISP_CMD_SET_MESHBUF_SIZE:
+		if (copy_from_user(&meshsize, up, sizeof(meshsize)))
+			return -EFAULT;
+		ret = rkisp_ioctl(sd, cmd, &meshsize);
 		break;
 	case RKISP_CMD_GET_SHM_BUFFD:
 		if (copy_from_user(&shmem, up, sizeof(shmem)))

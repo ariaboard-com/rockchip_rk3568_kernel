@@ -2352,6 +2352,23 @@ static void vop2_crtc_load_lut(struct drm_crtc *crtc)
 	vp->gamma_lut_active = true;
 
 	spin_unlock(&vop2->reg_lock);
+/*
+ * maybe appear the following case:
+ * -> set gamma
+ * -> config done
+ * -> atomic commit
+ *  --> update win format
+ *  --> update win address
+ *  ---> here maybe meet vop hardware frame start, and triggle some config take affect.
+ *  ---> as only some config take affect, this maybe lead to iommu pagefault.
+ *  --> update win size
+ *  --> update win other parameters
+ * -> config done
+ *
+ * so we add readx_poll_timeout() to make sure the first config done take
+ * effect and then to do next frame config.
+ */
+	readx_poll_timeout(CTRL_GET, dsp_lut_en, dle, dle, 5, 33333);
 #undef CTRL_GET
 }
 
@@ -4468,7 +4485,12 @@ static void vop2_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state
 
 	VOP_MODULE_SET(vop2, vp, vtotal_pw, vtotal << 16 | vsync_len);
 
-	VOP_MODULE_SET(vop2, vp, core_dclk_div, !!(adjusted_mode->flags & DRM_MODE_FLAG_DBLCLK));
+	if (adjusted_mode->flags & DRM_MODE_FLAG_DBLCLK ||
+	    vcstate->output_if & VOP_OUTPUT_IF_BT656)
+		VOP_MODULE_SET(vop2, vp, core_dclk_div, 1);
+	else
+		VOP_MODULE_SET(vop2, vp, core_dclk_div, 0);
+
 	if (vcstate->output_mode == ROCKCHIP_OUT_MODE_YUV420) {
 		VOP_MODULE_SET(vop2, vp, dclk_div2, 1);
 		VOP_MODULE_SET(vop2, vp, dclk_div2_phase_lock, 1);

@@ -293,7 +293,7 @@ static irqreturn_t tcon_irq_hanlder(int irq, void *dev_id)
 	intr_status = tcon_read(tcon, EBC_INT_STATUS);
 
 	if (intr_status & DSP_END_INT) {
-		tcon_update_bits(tcon, EBC_INT_STATUS, DSP_END_INT_CLR, DSP_END_INT_CLR);
+		tcon_update_bits(tcon, EBC_INT_STATUS, DSP_END_INT_CLR | LINE_FLAG_INT_CLR, DSP_END_INT_CLR | LINE_FLAG_INT_CLR);
 
 		if (tcon->dsp_end_callback)
 			tcon->dsp_end_callback();

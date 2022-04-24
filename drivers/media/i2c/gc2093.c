@@ -6,8 +6,13 @@
  *
  * V0.0X01.0X00 first version.
  * V0.0X01.0X01 Add HDR support.
+ * V0.0X01.0X02 update sensor driver
+ * 1. fix linear mode ae flicker issue.
+ * 2. add hdr mode exposure limit issue.
+ * 3. fix hdr mode highlighting pink issue.
+ * 4. add some debug info.
  */
-
+//#define DEBUG
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
@@ -28,7 +33,7 @@
 #include <media/v4l2-fwnode.h>
 #include <media/v4l2-subdev.h>
 
-#define DRIVER_VERSION		KERNEL_VERSION(0, 0x01, 0x01)
+#define DRIVER_VERSION		KERNEL_VERSION(0, 0x01, 0x02)
 #define GC2093_NAME		"gc2093"
 #define GC2093_MEDIA_BUS_FMT	MEDIA_BUS_FMT_SRGGB10_1X10
 
@@ -44,6 +49,12 @@
 #define GC2093_REG_EXP_SHORT_L	0x0002
 #define GC2093_REG_EXP_LONG_H	0x0003
 #define GC2093_REG_EXP_LONG_L	0x0004
+
+#define GC2093_REG_VB_H		0x0007
+#define GC2093_REG_VB_L		0x0008
+
+#define GC2093_REG_VTS_H	0x0041
+#define GC2093_REG_VTS_L	0x0042
 
 #define GC2093_MIRROR_FLIP_REG	0x0017
 #define MIRROR_MASK		BIT(0)
@@ -66,6 +77,7 @@
 #define GC2093_GAIN_MAX		0x2000
 #define GC2093_GAIN_STEP	1
 #define GC2093_GAIN_DEFAULT	64
+#define REG_NULL		0xFFFF
 
 #define GC2093_LANES		2
 
@@ -141,10 +153,10 @@ struct gc2093 {
 	const struct gc2093_mode *cur_mode;
 
 	u32		module_index;
-	u32		clkout_enabled_index;
 	const char      *module_facing;
 	const char      *module_name;
 	const char      *len_name;
+	u32		cur_vts;
 
 	bool			  has_init_exp;
 	struct preisp_hdrae_exp_s init_hdrae_exp;
@@ -240,7 +252,6 @@ static const struct reg_sequence gc2093_1080p_liner_settings[] = {
 	{0x0104, 0x01},
 	{0x010f, 0x00},
 	{0x0158, 0x00},
-	/* Darksun*/
 	{0x0123, 0x08},
 	{0x0123, 0x00},
 	{0x0120, 0x01},
@@ -360,6 +371,8 @@ static const struct reg_sequence gc2093_1080p_hdr_settings[] = {
 	{0x0104, 0x01},
 	{0x010e, 0x01},
 	{0x0158, 0x00},
+	{0x0183, 0x01},
+	{0x0187, 0x50},
 	/* Dark sun*/
 	{0x0123, 0x08},
 	{0x0123, 0x00},
@@ -450,9 +463,10 @@ static const struct gc2093_mode supported_modes[] = {
 };
 
 /* pixel rate = link frequency * 2 * lanes / BITS_PER_SAMPLE */
+/* * 2, to match suitable isp freq */
 static u64 to_pixel_rate(u32 index)
 {
-	u64 pixel_rate = link_freq_menu_items[index] * 2 * GC2093_LANES;
+	u64 pixel_rate = link_freq_menu_items[index] * 2 * GC2093_LANES * 2;
 
 	do_div(pixel_rate, 10);
 
@@ -548,7 +562,7 @@ static int gc2093_set_ctrl(struct v4l2_ctrl *ctrl)
 					     struct gc2093, ctrl_handler);
 	s64 max;
 	int ret = 0;
-	int val;
+	u32 vts = 0;
 
 	/* Propagate change of current control to all related controls */
 	switch (ctrl->id) {
@@ -566,19 +580,28 @@ static int gc2093_set_ctrl(struct v4l2_ctrl *ctrl)
 
 	switch (ctrl->id) {
 	case V4L2_CID_EXPOSURE:
-		if(val > 1100)
-			val = 1100;
-
+		if (gc2093->cur_mode->hdr_mode != NO_HDR)
+			goto ctrl_end;
+		dev_dbg(gc2093->dev, "set exposure value 0x%x\n", ctrl->val);
 		ret = gc2093_write_reg(gc2093, GC2093_REG_EXP_LONG_H,
 				       (ctrl->val >> 8) & 0x3f);
 		ret |= gc2093_write_reg(gc2093, GC2093_REG_EXP_LONG_L,
 					ctrl->val & 0xff);
 		break;
 	case V4L2_CID_ANALOGUE_GAIN:
+		if (gc2093->cur_mode->hdr_mode != NO_HDR)
+			goto ctrl_end;
+		dev_dbg(gc2093->dev, "set gain value 0x%x\n", ctrl->val);
 		gc2093_set_gain(gc2093, ctrl->val);
 		break;
 	case V4L2_CID_VBLANK:
-		/* The exposure goes up and reduces the frame rate, no need to write vb */
+		vts = gc2093->cur_mode->height + ctrl->val;
+		gc2093->cur_vts = vts;
+		ret = gc2093_write_reg(gc2093, GC2093_REG_VTS_H,
+				       (vts >> 8) & 0x3f);
+		ret |= gc2093_write_reg(gc2093, GC2093_REG_VTS_L,
+					vts & 0xff);
+		dev_dbg(gc2093->dev, " set blank value 0x%x\n", ctrl->val);
 		break;
 	case V4L2_CID_HFLIP:
 			regmap_update_bits(gc2093->regmap, GC2093_MIRROR_FLIP_REG,
@@ -594,6 +617,7 @@ static int gc2093_set_ctrl(struct v4l2_ctrl *ctrl)
 		break;
 	}
 
+ctrl_end:
 	pm_runtime_put(gc2093->dev);
 	return ret;
 }
@@ -644,6 +668,7 @@ static int gc2093_initialize_controls(struct gc2093 *gc2093)
 		gc2093->hblank->flags |= V4L2_CTRL_FLAG_READ_ONLY;
 
 	vblank_def = mode->vts_def - mode->height;
+	gc2093->cur_vts = mode->vts_def;
 	gc2093->vblank = v4l2_ctrl_new_std(handler, &gc2093_ctrl_ops,
 					   V4L2_CID_VBLANK, vblank_def,
 					   GC2093_VTS_MAX - mode->height,
@@ -687,19 +712,17 @@ static int __gc2093_power_on(struct gc2093 *gc2093)
 	int ret;
 	struct device *dev = gc2093->dev;
 
-	if (gc2093->clkout_enabled_index){
-		ret = clk_set_rate(gc2093->xvclk, GC2093_XVCLK_FREQ);
-		if (ret < 0)
-			dev_warn(dev, "Failed to set xvclk rate\n");
+	ret = clk_set_rate(gc2093->xvclk, GC2093_XVCLK_FREQ);
+	if (ret < 0)
+		dev_warn(dev, "Failed to set xvclk rate\n");
 
-		if (clk_get_rate(gc2093->xvclk) != GC2093_XVCLK_FREQ)
-			dev_warn(dev, "xvclk mismatched, modes are based on 27MHz\n");
+	if (clk_get_rate(gc2093->xvclk) != GC2093_XVCLK_FREQ)
+		dev_warn(dev, "xvclk mismatched, modes are based on 27MHz\n");
 
-		ret = clk_prepare_enable(gc2093->xvclk);
-		if (ret < 0) {
-			dev_err(dev, "Failed to enable xvclk\n");
-			return ret;
-		}
+	ret = clk_prepare_enable(gc2093->xvclk);
+	if (ret < 0) {
+		dev_err(dev, "Failed to enable xvclk\n");
+		return ret;
 	}
 
 	ret = regulator_bulk_enable(GC2093_NUM_SUPPLIES, gc2093->supplies);
@@ -723,8 +746,7 @@ static int __gc2093_power_on(struct gc2093 *gc2093)
 	return 0;
 
 disable_clk:
-	if (gc2093->clkout_enabled_index)
-		clk_disable_unprepare(gc2093->xvclk);
+	clk_disable_unprepare(gc2093->xvclk);
 	return ret;
 }
 
@@ -736,8 +758,7 @@ static void __gc2093_power_off(struct gc2093 *gc2093)
 		gpiod_set_value_cansleep(gc2093->pwdn_gpio, 0);
 
 	regulator_bulk_disable(GC2093_NUM_SUPPLIES, gc2093->supplies);
-	if (gc2093->clkout_enabled_index)
-		clk_disable_unprepare(gc2093->xvclk);
+	clk_disable_unprepare(gc2093->xvclk);
 }
 
 static int gc2093_check_sensor_id(struct gc2093 *gc2093)
@@ -780,6 +801,10 @@ static long gc2093_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	long ret = 0;
 	u32 i, h, w;
 	u32 stream = 0;
+	u8 vb_h = 0, vb_l = 0;
+	u16 vb = 0, cur_vts = 0, short_exp = 0, middle_exp = 0;
+	u64 delay_us = 0;
+	u32 fps = 0;
 
 	switch (cmd) {
 	case PREISP_CMD_SET_HDRAE_EXP:
@@ -791,34 +816,67 @@ static long gc2093_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		}
 
 		ret = gc2093_set_gain(gc2093, hdrae_exp->short_gain_reg);
+		if (ret) {
+			dev_err(gc2093->dev, "Failed to set gain!)\n");
+			return ret;
+		}
+
+		dev_dbg(gc2093->dev, "%s exp_reg middle: 0x%x, short: 0x%x, gain 0x%x\n",
+			__func__, hdrae_exp->middle_exp_reg,
+			hdrae_exp->short_exp_reg, hdrae_exp->short_gain_reg);
 		// Optimize blooming effect
-		if (hdrae_exp->middle_exp_reg < 0x30)
+		if (hdrae_exp->middle_exp_reg < 0x30 || hdrae_exp->short_exp_reg < 4)
 			gc2093_write_reg(gc2093, 0x0032, 0xfd);
 		else
 			gc2093_write_reg(gc2093, 0x0032, 0xf8);
 
-		if (hdrae_exp->middle_exp_reg > 1100)
-			hdrae_exp->middle_exp_reg = 1100;
+		/* hdr exp limit
+		 * 1. max short_exp_reg  < VB
+		 * 2. short_exp_reg + middle_exp_reg < framelength
+		 */
+		/* 30FPS sample */
+//		if (hdrae_exp->middle_exp_reg > 1100)
+//			hdrae_exp->middle_exp_reg = 1100;
+//
+//		if (hdrae_exp->short_exp_reg > 68)
+//			hdrae_exp->short_exp_reg = 68;
 
-		if (hdrae_exp->short_exp_reg > 68)
-			hdrae_exp->short_exp_reg = 68;
+		ret = gc2093_read_reg(gc2093, GC2093_REG_VB_H, &vb_h);
+		ret |= gc2093_read_reg(gc2093, GC2093_REG_VB_L, &vb_l);
+		if (ret) {
+			dev_err(gc2093->dev, "Failed to read vb data)\n");
+			return ret;
+		}
+		vb = vb_h << 8 | vb_l;
 
+		/* max short exposure limit to 3 ms */
+		if (hdrae_exp->short_exp_reg <= (vb - 8)) {
+			short_exp = hdrae_exp->short_exp_reg;
+		} else {
+			short_exp = vb - 8;
+			dev_err(gc2093->dev, "short exposure should be less than %d\n",
+				vb - 8);
+		}
+		cur_vts = gc2093->cur_vts;
+		dev_dbg(gc2093->dev, "%s cur_vts: 0x%x\n", __func__, cur_vts);
+
+		if (short_exp + hdrae_exp->middle_exp_reg > cur_vts) {
+			middle_exp = cur_vts - short_exp;
+			dev_err(gc2093->dev, "total exposure should be less than %d\n",
+				cur_vts);
+		} else {
+			middle_exp = hdrae_exp->middle_exp_reg;
+		}
+		dev_dbg(gc2093->dev, "%s cal exp_reg middle: 0x%x, short: 0x%x\n",
+			__func__, middle_exp, short_exp);
 		ret |= gc2093_write_reg(gc2093, GC2093_REG_EXP_LONG_H,
-					(hdrae_exp->middle_exp_reg >> 8) & 0x3f);
+					(middle_exp >> 8) & 0x3f);
 		ret |= gc2093_write_reg(gc2093, GC2093_REG_EXP_LONG_L,
-					hdrae_exp->middle_exp_reg & 0xff);
-
-	#if 0
+					middle_exp & 0xff);
 		ret |= gc2093_write_reg(gc2093, GC2093_REG_EXP_SHORT_H,
-					0x00);
+					(short_exp >> 8) & 0x3f);
 		ret |= gc2093_write_reg(gc2093, GC2093_REG_EXP_SHORT_L,
-					0x20);
-	#else
-		ret |= gc2093_write_reg(gc2093, GC2093_REG_EXP_SHORT_H,
-					(hdrae_exp->short_exp_reg >> 8) & 0x3f);
-		ret |= gc2093_write_reg(gc2093, GC2093_REG_EXP_SHORT_L,
-					hdrae_exp->short_exp_reg & 0xff);
-	#endif
+					short_exp & 0xff);
 		break;
 	case RKMODULE_GET_HDR_CFG:
 		hdr_cfg = (struct rkmodule_hdr_cfg *)arg;
@@ -848,6 +906,7 @@ static long gc2093_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			__v4l2_ctrl_modify_range(gc2093->vblank, h,
 						 GC2093_VTS_MAX - gc2093->cur_mode->height,
 						 1, h);
+			gc2093->cur_vts = gc2093->cur_mode->vts_def;
 			dev_info(gc2093->dev, "sensor mode: %d\n",
 				 gc2093->cur_mode->hdr_mode);
 		}
@@ -859,12 +918,17 @@ static long gc2093_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 
 		stream = *((u32 *)arg);
 
-		if (stream)
+		if (stream) {
 			ret = gc2093_write_reg(gc2093, GC2093_REG_CTRL_MODE,
 				GC2093_MODE_STREAMING);
-		else
+		} else {
 			ret = gc2093_write_reg(gc2093, GC2093_REG_CTRL_MODE,
 				GC2093_MODE_SW_STANDBY);
+			fps = gc2093->cur_mode->max_fps.denominator /
+				  gc2093->cur_mode->max_fps.numerator;
+			delay_us = 1000000 / (gc2093->cur_mode->vts_def * fps / gc2093->cur_vts);
+			usleep_range(delay_us, delay_us + 2000);
+		}
 		break;
 	default:
 		ret = -ENOIOCTLCMD;
@@ -928,8 +992,11 @@ static long gc2093_compat_ioctl32(struct v4l2_subdev *sd,
 		}
 
 		ret = gc2093_ioctl(sd, cmd, inf);
-		if (!ret)
+		if (!ret) {
 			ret = copy_to_user(up, inf, sizeof(*inf));
+			if (ret)
+				ret = -EFAULT;
+		}
 		kfree(inf);
 		break;
 	case RKMODULE_GET_HDR_CFG:
@@ -940,8 +1007,11 @@ static long gc2093_compat_ioctl32(struct v4l2_subdev *sd,
 		}
 
 		ret = gc2093_ioctl(sd, cmd, hdr);
-		if (!ret)
+		if (!ret) {
 			ret = copy_to_user(up, hdr, sizeof(*hdr));
+			if (ret)
+				ret = -EFAULT;
+		}
 		kfree(hdr);
 		break;
 	case RKMODULE_SET_HDR_CFG:
@@ -954,6 +1024,8 @@ static long gc2093_compat_ioctl32(struct v4l2_subdev *sd,
 		ret = copy_from_user(hdr, up, sizeof(*hdr));
 		if (!ret)
 			ret = gc2093_ioctl(sd, cmd, hdr);
+		else
+			ret = -EFAULT;
 		kfree(hdr);
 		break;
 	case PREISP_CMD_SET_HDRAE_EXP:
@@ -966,12 +1038,16 @@ static long gc2093_compat_ioctl32(struct v4l2_subdev *sd,
 		ret = copy_from_user(hdrae, up, sizeof(*hdrae));
 		if (!ret)
 			ret = gc2093_ioctl(sd, cmd, hdrae);
+		else
+			ret = -EFAULT;
 		kfree(hdrae);
 		break;
 	case RKMODULE_SET_QUICK_STREAM:
 		ret = copy_from_user(&stream, up, sizeof(u32));
 		if (!ret)
 			ret = gc2093_ioctl(sd, cmd, &stream);
+		else
+			ret = -EFAULT;
 		break;
 	default:
 		ret = -ENOIOCTLCMD;
@@ -985,6 +1061,16 @@ static int gc2093_s_stream(struct v4l2_subdev *sd, int on)
 {
 	struct gc2093 *gc2093 = to_gc2093(sd);
 	int ret = 0;
+	unsigned int fps;
+	unsigned int delay_us;
+
+	fps = DIV_ROUND_CLOSEST(gc2093->cur_mode->max_fps.denominator,
+					gc2093->cur_mode->max_fps.numerator);
+
+	dev_info(gc2093->dev, "%s: on: %d, %dx%d@%d\n", __func__, on,
+				gc2093->cur_mode->width,
+				gc2093->cur_mode->height,
+				fps);
 
 	mutex_lock(&gc2093->lock);
 	on = !!on;
@@ -1006,6 +1092,12 @@ static int gc2093_s_stream(struct v4l2_subdev *sd, int on)
 		}
 	} else {
 		__gc2093_stop_stream(gc2093);
+		/* delay to enable oneframe complete */
+		delay_us = 1000 * 1000 / fps;
+		usleep_range(delay_us, delay_us+10);
+		dev_info(gc2093->dev, "%s: on: %d, sleep(%dus)\n",
+				__func__, on, delay_us);
+
 		pm_runtime_put(gc2093->dev);
 	}
 
@@ -1311,18 +1403,10 @@ static int gc2093_probe(struct i2c_client *client,
 		return -EINVAL;
 	}
 
-	ret = of_property_read_u32(node, "firefly,clkout-enabled-index", &gc2093->clkout_enabled_index);
-	if (ret) {
-		dev_err(dev, "could not get firefly,clkout-enabled-index, default output xvclk\n");
-		gc2093->clkout_enabled_index = 1;
-	}
-
-	if (gc2093->clkout_enabled_index){
-		gc2093->xvclk = devm_clk_get(gc2093->dev, "xvclk");
-		if (IS_ERR(gc2093->xvclk)) {
-			dev_err(gc2093->dev, "Failed to get xvclk\n");
-			return -EINVAL;
-		}
+	gc2093->xvclk = devm_clk_get(gc2093->dev, "xvclk");
+	if (IS_ERR(gc2093->xvclk)) {
+		dev_err(gc2093->dev, "Failed to get xvclk\n");
+		return -EINVAL;
 	}
 
 	gc2093->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
@@ -1344,6 +1428,7 @@ static int gc2093_probe(struct i2c_client *client,
 	/* set default mode */
 	gc2093->cur_mode = &supported_modes[0];
 	gc2093->cfg_num = ARRAY_SIZE(supported_modes);
+	gc2093->cur_vts = gc2093->cur_mode->vts_def;
 
 	sd = &gc2093->subdev;
 	v4l2_i2c_subdev_init(sd, client, &gc2093_subdev_ops);

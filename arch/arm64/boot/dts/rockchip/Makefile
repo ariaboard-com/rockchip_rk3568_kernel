@@ -117,3 +117,4 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-firefly-itx-3568jq-lvds101_HSX101H40C.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-firefly-itx-3568jq-lvds101_HSX101H40C-cam_2ms2mf.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-firefly-itx-3568jq-mipi101_M101014_BE45_A1.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-firefly-itx-3568jq-mipi101_M101014_BE45_A1-cam_2ms2mf.dtb
+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk630-rk3568-ddr3-v10.dtb
