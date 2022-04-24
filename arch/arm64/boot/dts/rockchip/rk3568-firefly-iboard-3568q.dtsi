@@ -186,7 +186,6 @@
 	status = "disabled";
 };
 
-
 &i2c5 {
     status = "okay";
     /delete-node/ hym8563@51;
@@ -265,16 +264,16 @@
 
 &gmac0 {
     status = "okay";
-    tx_delay = <0x39>;
-    rx_delay = <0x2c>;
+    tx_delay = <0x3e>;
+    rx_delay = <0x34>;
 	snps,reset-gpio = <&gpio0 RK_PD5 GPIO_ACTIVE_LOW>;
 //	snps,reset-gpio = <&gpio2 RK_PD3 GPIO_ACTIVE_LOW>;
 };
 
 &gmac1 {
     status = "okay";
-    tx_delay = <0x49>;
-    rx_delay = <0x28>;
+    tx_delay = <0x4d>;
+    rx_delay = <0x2d>;
 	snps,reset-gpio = <&gpio1 RK_PB0 GPIO_ACTIVE_LOW>;
 };
 
