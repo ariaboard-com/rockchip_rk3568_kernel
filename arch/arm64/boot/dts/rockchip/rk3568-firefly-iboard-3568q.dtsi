@@ -178,11 +178,20 @@
 	/delete-node/ xc6130@23;
 };
 
+&i2c2{
+	status = "okay";
+	pinctrl-0 = <&i2c2m1_xfer>;
+};
+
 &vcc_camera {
 	status = "disabled";
 };
 
 &pwm11 {
+	status = "disabled";
+};
+
+&pwm14 {
 	status = "disabled";
 };
 
