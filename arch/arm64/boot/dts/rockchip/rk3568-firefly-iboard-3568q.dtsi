@@ -192,7 +192,7 @@
 };
 
 &pwm14 {
-	status = "disabled";
+	status = "okay";
 };
 
 &i2c5 {
