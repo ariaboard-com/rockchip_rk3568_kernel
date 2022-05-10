@@ -6,12 +6,12 @@
 
  /dts-v1/;
 #include <dt-bindings/display/media-bus-format.h>
-#include "rk3568-firefly-iboard-3568q.dtsi"
-#include "rk3568-firefly-iboard-3568q-cam-2ms2m.dtsi"
+#include "rk3568j-firefly-itxq.dtsi"
+#include "rk3568j-firefly-itxq-cam-2ms2m.dtsi"
 
 / {
-    model = "ITX-3568JQ HDMI+LVDS (Linux)";
-    compatible = "rockchip,rk3568-firefly-itx-3568jq-lvds", "rockchip,rk3568";
+    model = "ITX-3568Q HDMI+LVDS (Linux)";
+    compatible = "rockchip,rk3568j-firefly-itxq-lvds", "rockchip,rk3568";
 
     backlight:backlight {
         status = "okay";
