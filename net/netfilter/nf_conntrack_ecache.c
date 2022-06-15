@@ -469,6 +469,7 @@ void nf_conntrack_ecache_fini(void)
 	nf_ct_extend_unregister(&event_extend);
 }
 
+#ifdef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
 int nf_conntrack_register_chain_notifier(struct net *net, struct notifier_block *nb)
 {
 	return atomic_notifier_chain_register(&net->ct.nf_conntrack_chain, nb);
@@ -480,3 +481,4 @@ int nf_conntrack_unregister_chain_notifier(struct net *net, struct notifier_bloc
 	return atomic_notifier_chain_unregister(&net->ct.nf_conntrack_chain, nb);
 }
 EXPORT_SYMBOL_GPL(nf_conntrack_unregister_chain_notifier);
+#endif
