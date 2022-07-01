@@ -108,22 +108,17 @@
 		status = "okay";
 	};
 	
-	reserved-memory {
-		#address-cells = <2>;
-		#size-cells = <2>;
-		ranges;
-
-		dma_trans: dma_trans@3c000000 {
-			reg = <0x0 0x3c000000 0x0 0x04000000>;
-		};
-	};
-
 	gpio-poweroff {
 		compatible = "gpio-poweroff";
 		gpios = <&gpio1 RK_PB2 GPIO_ACTIVE_LOW>;
 		 timeout-ms = <3000>;
 	};
 
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+	};
 };
 
 &sdmmc0 {
@@ -140,6 +135,8 @@
 	cd-gpios = <&gpio0 RK_PB5 GPIO_ACTIVE_LOW>;
 	status = "okay";
 };
+
+
 
 &sdmmc1 {
 	max-frequency = <150000000>;
@@ -274,8 +271,6 @@
 &pcie3x2 {
 	reset-gpios = <&gpio0 RK_PC3 GPIO_ACTIVE_HIGH>;
 	vpcie3v3-supply = <&pcie30_3v3>;
-	memory-region = <&dma_trans>;
-	busno = <0>;
 	status = "okay";
 };
 

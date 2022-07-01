@@ -13,3 +13,7 @@
 	model = "Rockchip RK3568 photonicat Linux Board";
 	compatible = "rockchip,rk3568-photonicat", "rockchip,rk3568";
 };
+
+&rockchip_suspend {
+        status = "disabled";
+};

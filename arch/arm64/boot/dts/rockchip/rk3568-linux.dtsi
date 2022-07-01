@@ -49,6 +49,10 @@
 		ftrace-size = <0x00000>;
 		pmsg-size = <0x50000>;
 	};
+
+	dma_trans: dma_trans@3c000000 {
+		reg = <0x0 0x3c000000 0x0 0x04000000>;
+	};
 };
 
 &rng {
@@ -61,4 +65,9 @@
 
 &vop {
 	disable-win-move;
+};
+
+&pcie3x2 {
+        memory-region = <&dma_trans>;
+        busno = <0>;
 };
