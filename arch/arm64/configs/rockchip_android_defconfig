@@ -5460,7 +5460,7 @@ CONFIG_RK_HEADSET=y
 #
 # RKNPU
 #
-# CONFIG_ROCKCHIP_RKNPU is not set
+CONFIG_ROCKCHIP_RKNPU=m
 
 #
 # File systems

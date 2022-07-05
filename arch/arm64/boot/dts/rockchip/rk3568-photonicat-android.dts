@@ -17,3 +17,26 @@
 &rockchip_suspend {
         status = "disabled";
 };
+
+&rknpu {
+	status = "okay";
+};
+
+&rknpu_mmu {
+	status = "okay";
+};
+
+&dmc {
+	system-status-freq = <
+		/*system status         freq(KHz)*/
+		SYS_STATUS_NORMAL       780000
+		SYS_STATUS_REBOOT       1332000
+		SYS_STATUS_SUSPEND      324000
+		SYS_STATUS_VIDEO_4K     780000
+		SYS_STATUS_VIDEO_4K_10B 780000
+		SYS_STATUS_BOOST        1332000
+		SYS_STATUS_ISP          1332000
+		SYS_STATUS_PERFORMANCE  1332000
+		SYS_STATUS_DUALVIEW     1332000
+	>;
+};

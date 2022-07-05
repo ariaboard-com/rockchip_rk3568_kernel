@@ -294,6 +294,8 @@
 };
 
 &rknpu {
+	rknpu-supply = <&vdd_npu>;
+
 	status = "disabled";
 };
 
@@ -311,15 +313,12 @@
 	status = "okay";
 };
 
-&rkvdec_sram {
-	reg = <0x0 0x10000>;
-};
-
 &rkvenc {
 	status = "okay";
 };
 
 &rkvenc_mmu {
+	venc-supply = <&vdd_logic>;
 	status = "okay";
 };
 
