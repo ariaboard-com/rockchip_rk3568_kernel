@@ -32,12 +32,13 @@
 &rknpu {
 /*
 	memory-region = <&rknpu_reserved>;
-	rknpu-supply = <&vdd_npu>;
 */
-	status = "disabled";
+	rknpu-supply = <&vdd_npu>;
+
+	status = "okay";
 };
 
 &rknpu_mmu {
-	status = "disabled";
+	status = "okay";
 };
 
