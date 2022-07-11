@@ -378,6 +378,8 @@ int cdn_dp_software_train_link(struct cdn_dp_device *dp)
 	sink_max = drm_dp_max_link_rate(dp->dpcd);
 	rate = min(source_max, sink_max);
 	dp->link.rate = drm_dp_link_rate_to_bw_code(rate);
+	if(DP_LINK_BW_5_4 == dp->link.rate)
+		dp->link.rate = DP_LINK_BW_2_7;
 
 	ssc_on = !!(dp->dpcd[DP_MAX_DOWNSPREAD] & DP_MAX_DOWNSPREAD_0_5);
 	link_config[0] = ssc_on ? DP_SPREAD_AMP_0_5 : 0;

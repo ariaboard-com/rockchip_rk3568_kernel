@@ -209,7 +209,7 @@ static int tcon_enable(struct ebc_tcon *tcon, struct ebc_panel *panel)
 				| EPD_SDSHR(1));
 	tcon_write(tcon, EBC_DSP_START, DSP_SDCE_WIDTH(panel->ldl) | SW_BURST_CTRL);
 	tcon_write(tcon, EBC_DSP_CTRL,
-				DSP_SWAP_MODE(panel->panel_16bit ? 2 : 3) | DSP_VCOM_MODE(1) | DSP_SDCLK_DIV(panel->panel_16bit ? 7 : 3));
+				DSP_SWAP_MODE(panel->panel_16bit ? 2 : 3) | DSP_VCOM_MODE(1) | DSP_SDCLK_DIV(0));
 	tcon_cfg_done(tcon);
 
 	enable_irq(tcon->irq);
@@ -293,7 +293,7 @@ static irqreturn_t tcon_irq_hanlder(int irq, void *dev_id)
 	intr_status = tcon_read(tcon, EBC_INT_STATUS);
 
 	if (intr_status & DSP_END_INT) {
-		tcon_update_bits(tcon, EBC_INT_STATUS, DSP_END_INT_CLR, DSP_END_INT_CLR);
+		tcon_update_bits(tcon, EBC_INT_STATUS, DSP_END_INT_CLR | LINE_FLAG_INT_CLR, DSP_END_INT_CLR | LINE_FLAG_INT_CLR);
 
 		if (tcon->dsp_end_callback)
 			tcon->dsp_end_callback();

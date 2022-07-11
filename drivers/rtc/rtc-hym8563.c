@@ -253,7 +253,6 @@ static int hym8563_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
 		alarm_time += 60 - alm_tm->tm_sec;
 		rtc_time64_to_tm(alarm_time, alm_tm);
 	}
-
 	ret = i2c_smbus_read_byte_data(client, HYM8563_CTL2);
 	if (ret < 0)
 		return ret;
@@ -538,10 +537,13 @@ static int hym8563_probe(struct i2c_client *client,
 	int irq_gpio;
 	struct device_node *np = client->dev.of_node;
 	unsigned long irq_flags;
-	/* hym8563 initial time,avoid hym8563 read time error */
+	/*
+	 * hym8563 initial time(2021_1_1_12:00:00),
+	 * avoid hym8563 read time error
+	 */
 	struct rtc_time tm_read, tm = {
 		.tm_wday = 0,
-		.tm_year = 117,
+		.tm_year = 121,
 		.tm_mon = 0,
 		.tm_mday = 1,
 		.tm_hour = 12,
@@ -587,6 +589,11 @@ static int hym8563_probe(struct i2c_client *client,
 		}
 	}
 
+	if (client->irq > 0 ||
+	    device_property_read_bool(&client->dev, "wakeup-source")) {
+		device_init_wakeup(&client->dev, true);
+	}
+
 	/* check state of calendar information */
 	ret = i2c_smbus_read_byte_data(client, HYM8563_SEC);
 	if (ret < 0)
@@ -604,22 +611,19 @@ static int hym8563_probe(struct i2c_client *client,
 	}
 #endif
 
-	if (ret & HYM8563_SEC_VL)
-		ret = i2c_smbus_read_byte_data(client, HYM8563_SEC);
+	dev_info(&client->dev, "rtc information is %s\n",
+		(ret & HYM8563_SEC_VL) ? "invalid" : "valid");
 
 	hym8563->valid = !(ret & HYM8563_SEC_VL);
 	dev_dbg(&client->dev, "rtc information is %s\n",
 		hym8563->valid ? "valid" : "invalid");
 		
-#if 1
 	hym8563_rtc_read_time(&client->dev, &tm_read);
-	if (((tm_read.tm_year < 70) | (tm_read.tm_year > 137)) | (tm_read.tm_mon == -1) | (rtc_valid_tm(&tm_read) != 0)) //if the hym8563 haven't initialized
-	{
-		printk("zjy: rtc 22 %d %d %d %d\r\n", tm_read.tm_year, tm_read.tm_year, tm_read.tm_mon, rtc_valid_tm(&tm_read));
-		hym8563_rtc_set_time(&client->dev, &tm);	//initialize the hym8563
-	}
-#endif		
 		
+	if ((ret & HYM8563_SEC_VL) || (tm_read.tm_year < 70) || (tm_read.tm_year > 200) ||
+	    (tm_read.tm_mon == -1) || (rtc_valid_tm(&tm_read) != 0))
+		hym8563_rtc_set_time(&client->dev, &tm);
+
 	hym8563->rtc = devm_rtc_device_register(&client->dev, client->name,
 						&hym8563_rtc_ops, THIS_MODULE);
 

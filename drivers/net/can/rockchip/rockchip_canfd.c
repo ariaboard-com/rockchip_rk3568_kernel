@@ -126,6 +126,8 @@ enum rockchip_canfd_reg {
 #define RESET_MODE		0
 #define WORK_MODE		BIT(0)
 
+#define RX_PERIOD		BIT(2)
+
 #define RX_FINISH_INT		BIT(0)
 #define TX_FINISH_INT		BIT(1)
 #define ERR_WARN_INT		BIT(2)
@@ -209,11 +211,14 @@ enum rockchip_canfd_reg {
 struct rockchip_canfd {
 	struct can_priv can;
 	struct device *dev;
+	spinlock_t tx_lock;
+	struct napi_struct napi;
 	struct clk_bulk_data *clks;
 	int num_clks;
 	struct reset_control *reset;
 	void __iomem *base;
 	u32 irqstatus;
+	u32 data[120];
 };
 
 static inline u32 rockchip_canfd_read(const struct rockchip_canfd *priv,
@@ -481,11 +486,15 @@ static int rockchip_canfd_start_xmit(struct sk_buff *skb,
 	struct rockchip_canfd *rcan = netdev_priv(ndev);
 	struct canfd_frame *cf = (struct canfd_frame *)skb->data;
 	u32 id, dlc;
-	u32 cmd = CAN_TX0_REQ;
+	u32 cmd = CAN_TX0_REQ, mode;
 	int i;
+//	unsigned long flags;
 
 	if (can_dropped_invalid_skb(ndev, skb))
 		return NETDEV_TX_OK;
+
+//	spin_lock_irqsave(&rcan->tx_lock, flags);
+	can_put_echo_skb(skb, ndev, 0);
 
 	netif_stop_queue(ndev);
 
@@ -498,7 +507,15 @@ static int rockchip_canfd_start_xmit(struct sk_buff *skb,
 		id = cf->can_id & CAN_EFF_MASK;
 		dlc = can_len2dlc(cf->len) & DLC_MASK;
 		dlc |= FORMAT_MASK;
-
+		/* Extended frames need workround */
+		if ((rockchip_canfd_read(rcan, CAN_STATE) & RX_PERIOD) == 0) {
+			mode = rockchip_canfd_read(rcan, CAN_MODE);
+			rockchip_canfd_write(rcan, CAN_MODE,
+					     mode | MODE_SLEEP);
+			mode = rockchip_canfd_read(rcan, CAN_MODE);
+			rockchip_canfd_write(rcan, CAN_MODE,
+					     mode & (~MODE_SLEEP));
+		}
 		/* Extended frames remote TX request */
 		if (cf->can_id & CAN_RTR_FLAG)
 			dlc |= RTR_MASK;
@@ -525,14 +542,16 @@ static int rockchip_canfd_start_xmit(struct sk_buff *skb,
 		rockchip_canfd_write(rcan, CAN_TXDAT0 + i,
 				     *(u32 *)(cf->data + i));
 
-	can_put_echo_skb(skb, ndev, 0);
-
 	rockchip_canfd_write(rcan, CAN_CMD, cmd);
+
+	//can_put_echo_skb(skb, ndev, 0);
+
+//	spin_unlock_irqrestore(&rcan->tx_lock, flags);
 
 	return NETDEV_TX_OK;
 }
 
-static int rockchip_canfd_rx(struct net_device *ndev)
+static int rockchip_canfd_rx(struct net_device *ndev, int frame)
 {
 	struct rockchip_canfd *rcan = netdev_priv(ndev);
 	struct net_device_stats *stats = &ndev->stats;
@@ -542,13 +561,23 @@ static int rockchip_canfd_rx(struct net_device *ndev)
 	int i = 0;
 	u32 __maybe_unused ts, ret;
 	u32 data[16] = {0};
+//	unsigned long flags;
 
-	dlc = rockchip_canfd_read(rcan, CAN_RXFRD);
-	id_rockchip_canfd = rockchip_canfd_read(rcan, CAN_RXFRD);
-	ts = rockchip_canfd_read(rcan, CAN_RXFRD);
+//	spin_lock_irqsave(&rcan->tx_lock, flags);
+
+#if 1
+	dlc = rcan->data[frame * 18];
+	id_rockchip_canfd = rcan->data[frame * 18 + 1];
+	ts = rcan->data[frame * 18 + 2];
 	for (i = 0; i < 16; i++)
-		data[i] = rockchip_canfd_read(rcan, CAN_RXFRD);
-
+		data[i] = rcan->data[frame * 18 + i + 3];
+#else
+	dlc = rockchip_canfd_read(rcan, CAN_RXFRD);;
+	id_rockchip_canfd = rockchip_canfd_read(rcan, CAN_RXFRD);;
+	ts = rockchip_canfd_read(rcan, CAN_RXFRD);;
+	for (i = 0; i < 16; i++)
+		data[i] = rockchip_canfd_read(rcan, CAN_RXFRD);;
+#endif
 	/* create zero'ed CAN frame buffer */
 	if (dlc & FDF_MASK)
 		skb = alloc_canfd_skb(ndev, &cf);
@@ -556,6 +585,7 @@ static int rockchip_canfd_rx(struct net_device *ndev)
 		skb = alloc_can_skb(ndev, (struct can_frame **)&cf);
 	if (!skb) {
 		stats->rx_dropped++;
+		//spin_unlock_irqrestore(&rcan->tx_lock, flags);
 		return 0;
 	}
 
@@ -593,132 +623,116 @@ static int rockchip_canfd_rx(struct net_device *ndev)
 	netif_rx(skb);
 
 	can_led_event(ndev, CAN_LED_EVENT_RX);
+//	spin_unlock_irqrestore(&rcan->tx_lock, flags);
 
 	return 1;
 }
+/**
+ * rockchip_canfd_rx_poll - Poll routine for rx packets (NAPI)
+ * @napi:	napi structure pointer
+ * @quota:	Max number of rx packets to be processed.
+ *
+ * This is the poll routine for rx part.
+ * It will process the packets maximux quota value.
+ *
+ * Return: number of packets received
+ */
+static int  rockchip_canfd_rx_poll(struct napi_struct *napi, int quota)
+{
+	struct net_device *ndev = napi->dev;
+	struct rockchip_canfd *rcan = netdev_priv(ndev);
+	int work_done = 0, i = 0;
+	int frame = 0;
 
+	quota = (rockchip_canfd_read(rcan, 0x118) & 0x70) >> 4;
+
+	for (frame = 0; frame < quota; frame++) {
+		rcan->data[frame * 18] = rockchip_canfd_read(rcan, CAN_RXFRD);
+		rcan->data[frame * 18 + 1] = rockchip_canfd_read(rcan, CAN_RXFRD);
+		rcan->data[frame * 18 + 2] = rockchip_canfd_read(rcan, CAN_RXFRD);
+		for (i = 0; i < 16; i++)
+				rcan->data[frame * 18 + i + 3] = rockchip_canfd_read(rcan, CAN_RXFRD);
+	}
+
+	while (work_done < quota) {
+		work_done += rockchip_canfd_rx(ndev, work_done);
+	}
+
+	for (frame = 0; frame < quota; frame++) {
+		rcan->data[frame * 18] = 0;
+		rcan->data[frame * 18 + 1] = 0;
+		rcan->data[frame * 18 + 2] = 0;
+		for (i = 0; i < 16; i++)
+				rcan->data[frame * 18 + i + 3] = 0;
+	}
+
+	if (work_done) {
+		can_led_event(ndev, CAN_LED_EVENT_RX);
+	}
+
+	if (work_done < 6) {
+		napi_complete_done(napi, work_done);
+	}
+	return work_done;
+}
+
+int zq_test = 0;
 static int rockchip_canfd_err(struct net_device *ndev, u8 isr)
 {
 	struct rockchip_canfd *rcan = netdev_priv(ndev);
 	struct net_device_stats *stats = &ndev->stats;
-	enum can_state state = rcan->can.state;
-	enum can_state rx_state, tx_state;
 	struct can_frame *cf;
 	struct sk_buff *skb;
 	unsigned int rxerr, txerr;
-	u32 ecc, alc;
 	u32 sta_reg;
-
+	
 	skb = alloc_can_err_skb(ndev, &cf);
 
 	rxerr = rockchip_canfd_read(rcan, CAN_RX_ERR_CNT);
 	txerr = rockchip_canfd_read(rcan, CAN_TX_ERR_CNT);
 	sta_reg = rockchip_canfd_read(rcan, CAN_STATE);
-
+	
 	if (skb) {
 		cf->data[6] = txerr;
 		cf->data[7] = rxerr;
 	}
 
-	if (isr & RX_BUF_OV_INT) {
-		/* data overrun interrupt */
-		netdev_dbg(ndev, "data overrun interrupt\n");
+	if (isr & BUS_OFF_INT) {
+		rcan->can.state = CAN_STATE_BUS_OFF;
+		rcan->can.can_stats.bus_off++;
+		cf->can_id |= CAN_ERR_BUSOFF;
+	} else if (isr & ERR_WARN_INT) {
+		rcan->can.can_stats.error_warning++;
+		rcan->can.state = CAN_STATE_ERROR_WARNING;
+		/* error warning state */
 		if (likely(skb)) {
 			cf->can_id |= CAN_ERR_CRTL;
-			cf->data[1] = CAN_ERR_CRTL_RX_OVERFLOW;
+			cf->data[1] = (txerr > rxerr) ?
+				CAN_ERR_CRTL_TX_WARNING :
+				CAN_ERR_CRTL_RX_WARNING;
+			cf->data[6] = txerr;
+			cf->data[7] = rxerr;
 		}
-		stats->rx_over_errors++;
-		stats->rx_errors++;
-
-		/* reset the CAN IP by entering reset mode
-		 * ignoring timeout error
-		 */
-		set_reset_mode(ndev);
-		set_normal_mode(ndev);
+	} else if (isr & PASSIVE_ERR_INT) {
+		rcan->can.can_stats.error_passive++;
+		rcan->can.state = CAN_STATE_ERROR_PASSIVE;
+		/* error passive state */
+		cf->can_id |= CAN_ERR_CRTL;
+		cf->data[1] = (txerr > rxerr) ?
+					CAN_ERR_CRTL_TX_WARNING :
+					CAN_ERR_CRTL_RX_WARNING;
+		cf->data[6] = txerr;
+		cf->data[7] = rxerr;
 	}
 
-	if (isr & ERR_WARN_INT) {
-		/* error warning interrupt */
-		netdev_dbg(ndev, "error warning interrupt\n");
-
-		if (sta_reg & BUS_OFF_INT)
-			state = CAN_STATE_BUS_OFF;
-		else if (sta_reg & ERR_WARN_INT)
-			state = CAN_STATE_ERROR_WARNING;
-		else
-			state = CAN_STATE_ERROR_ACTIVE;
+	if ((rcan->can.state >= CAN_STATE_BUS_OFF) || ((sta_reg & 0x20) == 0x20)) {
+		zq_test++;
+		can_bus_off(ndev);
 	}
 
-	if (isr & BUS_ERR_INT) {
-		/* bus error interrupt */
-		netdev_dbg(ndev, "bus error interrupt, retry it.\n");
-		rcan->can.can_stats.bus_error++;
-		stats->rx_errors++;
-
-		if (likely(skb)) {
-			ecc = rockchip_canfd_read(rcan, CAN_ERR_CODE);
-
-			cf->can_id |= CAN_ERR_PROT | CAN_ERR_BUSERROR;
-
-			switch ((ecc & ERR_TYPE_MASK) >> ERR_TYPE_SHIFT) {
-			case BIT_ERR:
-				cf->data[2] |= CAN_ERR_PROT_BIT;
-				break;
-			case FORM_ERR:
-				cf->data[2] |= CAN_ERR_PROT_FORM;
-				break;
-			case STUFF_ERR:
-				cf->data[2] |= CAN_ERR_PROT_STUFF;
-				break;
-			default:
-				cf->data[3] = ecc & ERR_LOC_MASK;
-				break;
-			}
-			/* error occurred during transmission? */
-			if ((ecc & ERR_DIR_RX) == 0)
-				cf->data[2] |= CAN_ERR_PROT_TX;
-		}
-	}
-
-	if (isr & PASSIVE_ERR_INT) {
-		/* error passive interrupt */
-		netdev_dbg(ndev, "error passive interrupt\n");
-		if (state == CAN_STATE_ERROR_PASSIVE)
-			state = CAN_STATE_ERROR_WARNING;
-		else
-			state = CAN_STATE_ERROR_PASSIVE;
-	}
-	if (isr & TX_LOSTARB_INT) {
-		/* arbitration lost interrupt */
-		netdev_dbg(ndev, "arbitration lost interrupt\n");
-		alc = rockchip_canfd_read(rcan, CAN_LOSTARB_CODE);
-		rcan->can.can_stats.arbitration_lost++;
-		stats->tx_errors++;
-		if (likely(skb)) {
-			cf->can_id |= CAN_ERR_LOSTARB;
-			cf->data[0] = alc;
-		}
-	}
-
-	if (state != rcan->can.state) {
-		tx_state = txerr >= rxerr ? state : 0;
-		rx_state = txerr <= rxerr ? state : 0;
-
-		if (likely(skb))
-			can_change_state(ndev, cf, tx_state, rx_state);
-		else
-			rcan->can.state = state;
-		if (state == CAN_STATE_BUS_OFF)
-			can_bus_off(ndev);
-	}
-
-	if (likely(skb)) {
-		stats->rx_packets++;
-		stats->rx_bytes += cf->can_dlc;
-		netif_rx(skb);
-	} else {
-		return -ENOMEM;
-	}
+	stats->rx_packets++;
+	stats->rx_bytes += cf->can_dlc;
+	netif_receive_skb(skb);
 
 	return 0;
 }
@@ -732,8 +746,37 @@ static irqreturn_t rockchip_canfd_interrupt(int irq, void *dev_id)
 		     TX_LOSTARB_INT | BUS_ERR_INT;
 	u8 isr;
 	u32 dlc = 0;
+	u32 frame, quota = 0;
+	int i = 0;
+	//unsigned long flags;
 
 	isr = rockchip_canfd_read(rcan, CAN_INT);
+	if (isr & RX_FINISH_INT) {
+		#if 1
+		quota = (rockchip_canfd_read(rcan, 0x118) & 0x70) >> 4;
+
+		for (frame = 0; frame < quota; frame++) {
+			rcan->data[frame * 18] = rockchip_canfd_read(rcan, CAN_RXFRD);
+			rcan->data[frame * 18 + 1] = rockchip_canfd_read(rcan, CAN_RXFRD);
+			rcan->data[frame * 18 + 2] = rockchip_canfd_read(rcan, CAN_RXFRD);
+			for (i = 0; i < 16; i++)
+					rcan->data[frame * 18 + i + 3] = rockchip_canfd_read(rcan, CAN_RXFRD);
+		}
+		for (i = 0; i < quota; i++) {
+			rockchip_canfd_rx(ndev, i);
+		}
+		for (frame = 0; frame < quota; frame++) {
+			rcan->data[frame * 18] = 0;
+			rcan->data[frame * 18 + 1] = 0;
+			rcan->data[frame * 18 + 2] = 0;
+			for (i = 0; i < 16; i++)
+					rcan->data[frame * 18 + i + 3] = 0;
+		}
+		#else
+		napi_schedule(&rcan->napi);
+		#endif
+	}
+
 	if (isr & TX_FINISH_INT) {
 		dlc = rockchip_canfd_read(rcan, CAN_TXFIC);
 		/* transmission complete interrupt */
@@ -742,15 +785,14 @@ static irqreturn_t rockchip_canfd_interrupt(int irq, void *dev_id)
 		else
 			stats->tx_bytes += (dlc & DLC_MASK);
 		stats->tx_packets++;
-		rockchip_canfd_write(rcan, CAN_CMD, 0);
+	//	spin_lock_irqsave(&rcan->tx_lock, flags);
 		can_get_echo_skb(ndev, 0);
 		netif_wake_queue(ndev);
+	//	spin_unlock_irqrestore(&rcan->tx_lock, flags);
 		can_led_event(ndev, CAN_LED_EVENT_TX);
 	}
 
-	if (isr & RX_FINISH_INT)
-		rockchip_canfd_rx(ndev);
-
+	isr = rockchip_canfd_read(rcan, CAN_INT);
 	if (isr & err_int) {
 		/* error interrupt */
 		if (rockchip_canfd_err(ndev, isr))
@@ -785,6 +827,7 @@ static int rockchip_canfd_open(struct net_device *ndev)
 	}
 
 	can_led_event(ndev, CAN_LED_EVENT_OPEN);
+	napi_enable(&rcan->napi);
 	netif_start_queue(ndev);
 
 	netdev_dbg(ndev, "%s\n", __func__);
@@ -802,6 +845,7 @@ static int rockchip_canfd_close(struct net_device *ndev)
 	struct rockchip_canfd *rcan = netdev_priv(ndev);
 
 	netif_stop_queue(ndev);
+	napi_disable(&rcan->napi);
 	rockchip_canfd_stop(ndev);
 	close_candev(ndev);
 	can_led_event(ndev, CAN_LED_EVENT_STOP);
@@ -979,10 +1023,12 @@ static int rockchip_canfd_probe(struct platform_device *pdev)
 	/* IFI CANFD can do both Bosch FD and ISO FD */
 	rcan->can.ctrlmode_supported = CAN_CTRLMODE_LOOPBACK |
 				       CAN_CTRLMODE_FD;
+	rcan->can.restart_ms = 1;
 
 	ndev->netdev_ops = &rockchip_canfd_netdev_ops;
 	ndev->irq = irq;
 	ndev->flags |= IFF_ECHO;
+	spin_lock_init(&rcan->tx_lock);
 
 	platform_set_drvdata(pdev, ndev);
 	SET_NETDEV_DEV(ndev, &pdev->dev);
@@ -994,7 +1040,7 @@ static int rockchip_canfd_probe(struct platform_device *pdev)
 			__func__, err);
 		goto err_pmdisable;
 	}
-
+	netif_napi_add(ndev, &rcan->napi, rockchip_canfd_rx_poll, 6);
 	err = register_candev(ndev);
 	if (err) {
 		dev_err(&pdev->dev, "registering %s failed (err=%d)\n",
@@ -1018,9 +1064,11 @@ err_pmdisable:
 static int rockchip_canfd_remove(struct platform_device *pdev)
 {
 	struct net_device *ndev = platform_get_drvdata(pdev);
+	struct rockchip_canfd *rcan = netdev_priv(ndev);
 
 	unregister_netdev(ndev);
 	pm_runtime_disable(&pdev->dev);
+	netif_napi_del(&rcan->napi);
 	free_candev(ndev);
 
 	return 0;

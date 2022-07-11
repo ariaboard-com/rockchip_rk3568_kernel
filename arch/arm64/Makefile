@@ -126,10 +126,10 @@ core-$(CONFIG_EFI_STUB) += $(objtree)/drivers/firmware/efi/libstub/lib.a
 
 # Default target when executing plain make
 boot		:= arch/arm64/boot
-KBUILD_IMAGE	:= $(boot)/Image.gz
+KBUILD_IMAGE	:= $(boot)/Image
 KBUILD_DTBS	:= dtbs
 
-all:	Image.gz $(KBUILD_DTBS)
+all:	Image $(KBUILD_DTBS)
 
 
 Image: vmlinux
@@ -150,7 +150,7 @@ dtbs: prepare scripts
 	$(Q)$(MAKE) $(build)=$(boot)/dts
 
 dtbs_install:
-	$(Q)$(MAKE) $(dtbinst)=$(boot)/dts
+	$(Q)$(MAKE) $(dtbinst)=$(boot)/dts/rockchip
 
 PHONY += vdso_install
 vdso_install:

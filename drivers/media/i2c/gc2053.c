@@ -147,6 +147,7 @@ struct gc2053 {
 	unsigned int        pixel_rate;
 
 	u32         module_index;
+	u32         clkout_enabled_index;
 	const char      *module_facing;
 	const char      *module_name;
 	const char      *len_name;
@@ -718,15 +719,17 @@ static int __gc2053_power_on(struct gc2053 *gc2053)
 			dev_err(dev, "could not set pins\n");
 	}
 
-	ret = clk_set_rate(gc2053->xvclk, GC2053_XVCLK_FREQ);
-	if (ret < 0)
-		dev_warn(dev, "Failed to set xvclk rate (24MHz)\n");
-	if (clk_get_rate(gc2053->xvclk) != GC2053_XVCLK_FREQ)
-		dev_warn(dev, "xvclk mismatched, modes are based on 24MHz\n");
-	ret = clk_prepare_enable(gc2053->xvclk);
-	if (ret < 0) {
-		dev_err(dev, "Failed to enable xvclk\n");
-		return ret;
+	if (gc2053->clkout_enabled_index){
+		ret = clk_set_rate(gc2053->xvclk, GC2053_XVCLK_FREQ);
+		if (ret < 0)
+			dev_warn(dev, "Failed to set xvclk rate (24MHz)\n");
+		if (clk_get_rate(gc2053->xvclk) != GC2053_XVCLK_FREQ)
+			dev_warn(dev, "xvclk mismatched, modes are based on 24MHz\n");
+		ret = clk_prepare_enable(gc2053->xvclk);
+		if (ret < 0) {
+			dev_err(dev, "Failed to enable xvclk\n");
+			return ret;
+		}
 	}
 
 	ret = regulator_bulk_enable(GC2053_NUM_SUPPLIES, gc2053->supplies);
@@ -754,7 +757,8 @@ static int __gc2053_power_on(struct gc2053 *gc2053)
 	return 0;
 
 disable_clk:
-	clk_disable_unprepare(gc2053->xvclk);
+	if (gc2053->clkout_enabled_index)
+		clk_disable_unprepare(gc2053->xvclk);
 	return ret;
 }
 
@@ -765,7 +769,8 @@ static void __gc2053_power_off(struct gc2053 *gc2053)
 
 	if (!IS_ERR(gc2053->pwdn_gpio))
 		gpiod_set_value_cansleep(gc2053->pwdn_gpio, 1);
-	clk_disable_unprepare(gc2053->xvclk);
+	if (gc2053->clkout_enabled_index)
+		clk_disable_unprepare(gc2053->xvclk);
 
 	if (!IS_ERR(gc2053->reset_gpio))
 		gpiod_set_value_cansleep(gc2053->reset_gpio, 1);
@@ -1344,10 +1349,18 @@ static int gc2053_probe(struct i2c_client *client,
 		return -EINVAL;
 	}
 
-	gc2053->xvclk = devm_clk_get(&client->dev, "xvclk");
-	if (IS_ERR(gc2053->xvclk)) {
-		dev_err(&client->dev, "Failed to get xvclk\n");
-		return -EINVAL;
+	ret = of_property_read_u32(node, "firefly,clkout-enabled-index", &gc2053->clkout_enabled_index);
+	if (ret) {
+		dev_err(dev, "could not get firefly,clkout-enabled-index, default output xvclk\n");
+		gc2053->clkout_enabled_index = 1;
+	}
+
+	if (gc2053->clkout_enabled_index){
+		gc2053->xvclk = devm_clk_get(&client->dev, "xvclk");
+		if (IS_ERR(gc2053->xvclk)) {
+			dev_err(&client->dev, "Failed to get xvclk\n");
+			return -EINVAL;
+		}
 	}
 
 	gc2053->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);

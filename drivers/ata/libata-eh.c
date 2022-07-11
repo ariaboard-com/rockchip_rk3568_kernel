@@ -48,6 +48,7 @@
 
 #include <trace/events/libata.h>
 #include "libata.h"
+#include "ahci.h"
 
 enum {
 	/* speed down verdicts */
@@ -114,6 +115,12 @@ static const unsigned long ata_eh_identify_timeouts[] = {
 	ULONG_MAX,
 };
 
+static const unsigned long ata_eh_revalidate_timeouts[] = {
+	15000,	/* Some drives are slow to read log pages when waking-up */
+	15000,  /* combined time till here is enough even for media access */
+	ULONG_MAX,
+};
+
 static const unsigned long ata_eh_flush_timeouts[] = {
 	15000,	/* be generous with flush */
 	15000,  /* ditto */
@@ -150,6 +157,8 @@ static const struct ata_eh_cmd_timeout_ent
 ata_eh_cmd_timeout_table[ATA_EH_CMD_TIMEOUT_TABLE_SIZE] = {
 	{ .commands = CMDS(ATA_CMD_ID_ATA, ATA_CMD_ID_ATAPI),
 	  .timeouts = ata_eh_identify_timeouts, },
+	{ .commands = CMDS(ATA_CMD_READ_LOG_EXT, ATA_CMD_READ_LOG_DMA_EXT),
+	  .timeouts = ata_eh_revalidate_timeouts, },
 	{ .commands = CMDS(ATA_CMD_READ_NATIVE_MAX, ATA_CMD_READ_NATIVE_MAX_EXT),
 	  .timeouts = ata_eh_other_timeouts, },
 	{ .commands = CMDS(ATA_CMD_SET_MAX, ATA_CMD_SET_MAX_EXT),
@@ -2971,6 +2980,14 @@ int ata_eh_reset(struct ata_link *link, int classify,
 		ata_link_warn(link,
 			      "link online but %d devices misclassified, "
 			      "device detection might fail\n", nr_unknown);
+	} else if (ata_is_host_link(link)) {
+		ata_link_err(link, "ready = %x sstatus = %x\n", ahci_check_ready(link), sstatus);
+		if (!ahci_check_ready(link) && try < max_tries && sstatus != 3) {
+			ata_link_err(link, "rk: link port busy, retrying %d\n", try);
+			failed_link = link;
+			rc = -EAGAIN;
+			goto fail;
+		}
 	}
 
 	/* reset successful, schedule revalidation */

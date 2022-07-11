@@ -55,6 +55,9 @@ case $ARCH in
 um)
 	installed_image_path="usr/bin/linux-$version"
 	;;
+arm*)
+	installed_image_path="boot/Image-$version"
+	;;
 parisc|mips|powerpc)
 	installed_image_path="boot/vmlinux-$version"
 	;;
@@ -87,6 +90,20 @@ if grep -q "^CONFIG_OF=y" $KCONFIG_CONFIG ; then
 	# Only some architectures with OF support have this target
 	if grep -q dtbs_install "${srctree}/arch/$SRCARCH/Makefile"; then
 		$MAKE KBUILD_SRC= INSTALL_DTBS_PATH="$tmpdir/usr/lib/$packagename" dtbs_install
+	fi
+fi
+
+if grep -q "^CONFIG_ARCH_ROCKCHIP=y" $KCONFIG_CONFIG ; then
+	mkdir -p "$tmpdir/boot/extlinux"
+	echo "label ${RK_KERNEL_DTS} linux-$version" > $tmpdir/boot/extlinux/extlinux.conf
+	echo -e "\tkernel /Image-$version" >> $tmpdir/boot/extlinux/extlinux.conf
+	if [ -f "$tmpdir/usr/lib/$packagename/${RK_KERNEL_DTS}.dtb" ]; then
+		cp "$tmpdir/usr/lib/$packagename/${RK_KERNEL_DTS}.dtb" "$tmpdir/boot/"
+		echo -e "\tfdt /${RK_KERNEL_DTS}.dtb" >> $tmpdir/boot/extlinux/extlinux.conf
+	fi
+	if [ -e "ramdisk.img" ]; then
+		cp "ramdisk.img" "$tmpdir/boot/initrd-$version"
+		echo -e "\tinitrd /initrd-$version" >> $tmpdir/boot/extlinux/extlinux.conf
 	fi
 fi
 
@@ -134,6 +151,11 @@ if grep -q '^CONFIG_BLK_DEV_INITRD=y' $KCONFIG_CONFIG; then
 else
 	want_initrd=No
 fi
+
+if grep -q "^CONFIG_ARCH_ROCKCHIP=y" $KCONFIG_CONFIG ; then
+	want_initrd=No
+fi
+
 for script in postinst postrm preinst prerm ; do
 	mkdir -p "$tmpdir$debhookdir/$script.d"
 	cat <<EOF > "$tmpdir/DEBIAN/$script"
@@ -155,7 +177,7 @@ done
 
 # Build kernel header package
 (cd $srctree; find . -name Makefile\* -o -name Kconfig\* -o -name \*.pl) > "$objtree/debian/hdrsrcfiles"
-(cd $srctree; find arch/*/include include scripts -type f -o -type l) >> "$objtree/debian/hdrsrcfiles"
+(cd $srctree; find arch/arm{,64}/include include scripts -type f -o -type l) >> "$objtree/debian/hdrsrcfiles"
 (cd $srctree; find arch/$SRCARCH -name module.lds -o -name Kbuild.platforms -o -name Platform) >> "$objtree/debian/hdrsrcfiles"
 (cd $srctree; find $(find arch/$SRCARCH -name include -o -name scripts -type d) -type f) >> "$objtree/debian/hdrsrcfiles"
 if grep -q '^CONFIG_STACK_VALIDATION=y' $KCONFIG_CONFIG ; then
