@@ -15,7 +15,24 @@
 };
 
 &rockchip_suspend {
-        status = "disabled";
+	rockchip,sleep-mode-config = <
+		(0
+		| RKPM_SLP_CENTER_OFF
+		| RKPM_SLP_HW_PLLS_OFF
+		| RKPM_SLP_PMUALIVE_32K
+		| RKPM_SLP_PMIC_LP
+		| RKPM_SLP_32K_PVTM
+		)
+	>;
+	rockchip,wakeup-config = <
+		(0
+		| RKPM_PWM0_WKUP_EN
+		| RKPM_CPU0_WKUP_EN
+		| RKPM_USB_WKUP_EN
+		)
+	>;
+
+        status = "okay";
 };
 
 &rknpu {
@@ -26,17 +43,3 @@
 	status = "okay";
 };
 
-&dmc {
-	system-status-freq = <
-		/*system status         freq(KHz)*/
-		SYS_STATUS_NORMAL       780000
-		SYS_STATUS_REBOOT       1332000
-		SYS_STATUS_SUSPEND      324000
-		SYS_STATUS_VIDEO_4K     780000
-		SYS_STATUS_VIDEO_4K_10B 780000
-		SYS_STATUS_BOOST        1332000
-		SYS_STATUS_ISP          1332000
-		SYS_STATUS_PERFORMANCE  1332000
-		SYS_STATUS_DUALVIEW     1332000
-	>;
-};
