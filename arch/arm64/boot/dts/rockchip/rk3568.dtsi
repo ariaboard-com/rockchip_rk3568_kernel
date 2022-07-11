@@ -156,9 +156,6 @@
 			1104      1608   75000
 		>;
 
-		nvmem-cells = <&cpu_leakage>;
-		nvmem-cell-names = "leakage";
-
 		opp-408000000 {
 			opp-hz = /bits/ 64 <408000000>;
 			opp-microvolt = <850000 850000 1150000>;
@@ -2608,6 +2605,10 @@
 			reg = <0x08 0x1>;
 			bits = <3 3>;
 		};
+		mbist_vmin: mbist-vmin@9 {
+			reg = <0x09 0x1>;
+			bits = <0 4>;
+		};
 		otp_id: id@a {
 			reg = <0x0a 0x10>;
 		};
@@ -2622,6 +2623,9 @@
 		};
 		gpu_leakage: gpu-leakage@1d {
 			reg = <0x1d 0x1>;
+		};
+		core_pvtm:core-pvtm@2a {
+			reg = <0x2a 0x2>;
 		};
 	};
 
