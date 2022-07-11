@@ -125,7 +125,7 @@
 	max-frequency = <150000000>;
 	supports-sd;
 	bus-width = <4>;
-	cap-sd-highspeed;
+	/* cap-sd-highspeed; */
 	disable-wp;
 	no-1-8-v;
 	vmmc-supply = <&vcc_3v3>;
