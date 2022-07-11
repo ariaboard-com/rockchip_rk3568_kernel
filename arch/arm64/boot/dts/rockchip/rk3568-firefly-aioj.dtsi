@@ -198,7 +198,6 @@
 
 &sdmmc2 {
 	status = "okay";
-	max-frequency = <100000000>;
 };
 
 &wireless_wlan {
@@ -218,6 +217,8 @@
 
 &rk809_codec {
     hp-ctl-gpios = <&gpio1 RK_PB0 GPIO_ACTIVE_HIGH>;
+	hp-det-adc-value = <300>;
+	hp-adc-drift-scope = <300>;
 };
 
 &rk809 {

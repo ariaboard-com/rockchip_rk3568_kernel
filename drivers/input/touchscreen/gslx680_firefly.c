@@ -196,13 +196,13 @@ static int gslX680_init(void)
 
 	gpio_direction_output(g_wake_pin, 0);
 	msleep(20);
-	gpio_set_value(g_wake_pin,1);
+	gpio_set_value_cansleep(g_wake_pin,1);
 
 	/*gpio_direction_output(WAKE_PORT, 0);
 	gpio_set_value(WAKE_PORT,GPIO_HIGH);*/
 	msleep(20);
 
-	gpio_set_value(g_irq_pin,1);
+	gpio_set_value_cansleep(g_irq_pin,1);
 //	gpio_pull_updown(IRQ_PORT, 1);
 
 	msleep(20);
@@ -214,7 +214,7 @@ static int gslX680_shutdown_low(void)
 if(g_wake_pin !=0)
 	{
 	gpio_direction_output(g_wake_pin, 0);
-	gpio_set_value(g_wake_pin,0);
+	gpio_set_value_cansleep(g_wake_pin,0);
 }
 	return 0;
 }
@@ -224,7 +224,7 @@ static int gslX680_shutdown_high(void)
 	if(g_wake_pin !=0)
 	{
 		gpio_direction_output(g_wake_pin, 0);
-		gpio_set_value(g_wake_pin,1);
+		gpio_set_value_cansleep(g_wake_pin,1);
 	}
 	return 0;
 }
@@ -1450,7 +1450,7 @@ static int  gsl_ts_probe(struct i2c_client *client,
 		gsl_proc_flag = 0;
 #endif
 
-	gpio_set_value(ts->irq_pin, 0);
+	gpio_set_value_cansleep(ts->irq_pin, 0);
 	enable_irq(ts->irq);
 	printk("[GSLX680] End %s\n", __func__);
 

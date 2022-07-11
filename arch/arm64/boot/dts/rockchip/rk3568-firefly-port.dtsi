@@ -9,6 +9,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/pinctrl/rockchip.h>
 #include "rk3568-firefly-core.dtsi"
+#include "rk3568-linux.dtsi"
 
 / {
 	compatible = "rockchip,rk3568-firefly-port", "rockchip,rk3568";
@@ -43,14 +44,6 @@
 			linux,code = <KEY_BACK>;
 			press-threshold-microvolt = <1305500>;
 		};
-	};
-
-	rk_headset: rk-headset {
-		status = "disabled";
-		compatible = "rockchip_headset";
-		headset_gpio = <&gpio3 RK_PC2 GPIO_ACTIVE_LOW>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&hp_det>;
 	};
 
 	vcc2v5_sys: vcc2v5-ddr {
@@ -151,6 +144,29 @@
 		BT,reset_gpio    = <&gpio3 RK_PA0 GPIO_ACTIVE_HIGH>;
 		BT,wake_gpio     = <&gpio3 RK_PA1 GPIO_ACTIVE_HIGH>;
 		BT,wake_host_irq = <&gpio3 RK_PA2 GPIO_ACTIVE_HIGH>;
+		status = "disabled";
+	};
+
+	flash_led: flash-led {
+		compatible = "led,rgb13h";
+		label = "pwm-flash-led";
+		led-max-microamp = <20000>;
+		flash-max-microamp = <20000>;
+		flash-max-timeout-us = <1000000>;
+		pwms = <&pwm11 0 25000 0>;
+		rockchip,camera-module-index = <1>;
+		rockchip,camera-module-facing = "front";
+		status = "disabled";
+	};
+
+	vcc_camera: vcc-camera-regulator {
+		compatible = "regulator-fixed";
+		//gpio = <&pca9555 PCA_IO0_0 GPIO_ACTIVE_HIGH>;
+		gpio = <&pca9555 PCA_IO0_3 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&vcc_cam>;
+		regulator-name = "vcc_camera";
+		enable-active-high;
 		status = "disabled";
 	};
 };
@@ -427,6 +443,14 @@
 	status = "disabled";
 };
 
+&rk809_sound {
+	/delete-property/ simple-audio-card,hp-det-gpio;
+};
+
+&rk809_codec {
+	pinctrl-0 = <&i2s1m0_mclk>;
+};
+
 &rkisp {
 	status = "okay";
 };
@@ -495,16 +519,18 @@
 
 &can1 {
 	status = "disabled";
+	compatible = "rockchip,can-1.0";
 	assigned-clocks = <&cru CLK_CAN1>;
-	assigned-clock-rates = <100000000>;
+	assigned-clock-rates = <200000000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&can1m1_pins>;
 };
 
 &can2 {
 	status = "disabled";
+	compatible = "rockchip,can-1.0";
 	assigned-clocks = <&cru CLK_CAN2>;
-	assigned-clock-rates = <100000000>;
+	assigned-clock-rates = <200000000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&can2m0_pins>;
 };
@@ -563,7 +589,7 @@
 
 &pinctrl {
 	cam {
-		camera_pwr: camera-pwr {
+		vcc_cam: vcc-cam {
 			rockchip,pins =
 				/* camera power en */
 				<0 RK_PC1 RK_FUNC_GPIO &pcfg_pull_none>;
@@ -614,3 +640,4 @@
     assigned-clock-rates = <50000000>;
     status = "okay";
 };
+

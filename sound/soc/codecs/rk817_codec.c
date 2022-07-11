@@ -128,6 +128,7 @@ struct rk817_codec_priv {
 	bool hp_insert;
 	struct snd_soc_jack hp_jack;
 	struct extcon_dev *edev;
+	int chip_ver;
 };
 
 static const struct reg_default rk817_reg_defaults[] = {
@@ -193,6 +194,8 @@ static bool rk817_volatile_register(struct device *dev, unsigned int reg)
 {
 	switch (reg) {
 	case RK817_CODEC_DTOP_LPT_SRST:
+	case RK817_PMIC_CHIP_NAME:
+	case RK817_PMIC_CHIP_VER:
 		return true;
 	default:
 		return false;
@@ -258,6 +261,8 @@ static bool rk817_codec_register(struct device *dev, unsigned int reg)
 	case RK817_CODEC_DI2S_TXCR1:
 	case RK817_CODEC_DI2S_TXCR2:
 	case RK817_CODEC_DI2S_TXCR3_TXCMD:
+	case RK817_PMIC_CHIP_NAME:
+	case RK817_PMIC_CHIP_VER:
 		return true;
 	default:
 		return false;
@@ -269,14 +274,14 @@ static int rk817_codec_ctl_gpio(struct rk817_codec_priv *rk817,
 {
 	if ((gpio & CODEC_SET_SPK) &&
 	    rk817->spk_ctl_gpio) {
-		gpiod_set_value(rk817->spk_ctl_gpio, level);
+		gpiod_set_value_cansleep(rk817->spk_ctl_gpio, level);
 		DBG("%s set spk clt %d\n", __func__, level);
 		msleep(rk817->spk_mute_delay);
 	}
 
 	if ((gpio & CODEC_SET_HP) &&
 	    rk817->hp_ctl_gpio) {
-		gpiod_set_value(rk817->hp_ctl_gpio, level);
+		gpiod_set_value_cansleep(rk817->hp_ctl_gpio, level);
 		DBG("%s set hp clt %d\n", __func__, level);
 		msleep(rk817->hp_mute_delay);
 	}
@@ -288,7 +293,7 @@ static int rk817_reset(struct snd_soc_component *component)
 	snd_soc_component_write(component, RK817_CODEC_DTOP_LPT_SRST, 0x40);
 	snd_soc_component_write(component, RK817_CODEC_DDAC_POPD_DACST, 0x02);
 	snd_soc_component_write(component, RK817_CODEC_DI2S_CKM, 0x00);
-	snd_soc_component_write(component, RK817_CODEC_DTOP_DIGEN_CLKE, 0x0f);
+	snd_soc_component_write(component, RK817_CODEC_DTOP_DIGEN_CLKE, 0xff);
 	snd_soc_component_write(component, RK817_CODEC_APLL_CFG0, 0x04);
 	snd_soc_component_write(component, RK817_CODEC_APLL_CFG1, 0x58);
 	snd_soc_component_write(component, RK817_CODEC_APLL_CFG2, 0x2d);
@@ -303,12 +308,10 @@ static int rk817_reset(struct snd_soc_component *component)
 static struct rk817_reg_val_typ playback_power_up_list[] = {
 	{RK817_CODEC_AREF_RTCFG1, 0x40},
 	{RK817_CODEC_DDAC_POPD_DACST, 0x02},
-	{RK817_CODEC_DDAC_SR_LMT0, 0x02},
 	/* APLL */
 	{RK817_CODEC_APLL_CFG0, 0x04},
 	{RK817_CODEC_APLL_CFG1, 0x58},
 	{RK817_CODEC_APLL_CFG2, 0x2d},
-	{RK817_CODEC_APLL_CFG3, 0x0c},
 	{RK817_CODEC_APLL_CFG4, 0xa5},
 	{RK817_CODEC_APLL_CFG5, 0x00},
 
@@ -342,13 +345,11 @@ static struct rk817_reg_val_typ playback_power_down_list[] = {
 
 static struct rk817_reg_val_typ capture_power_up_list[] = {
 	{RK817_CODEC_AREF_RTCFG1, 0x40},
-	{RK817_CODEC_DDAC_SR_LMT0, 0x02},
 	{RK817_CODEC_DADC_SR_ACL0, 0x02},
 	/* {RK817_CODEC_DTOP_DIGEN_CLKE, 0xff}, */
 	{RK817_CODEC_APLL_CFG0, 0x04},
 	{RK817_CODEC_APLL_CFG1, 0x58},
 	{RK817_CODEC_APLL_CFG2, 0x2d},
-	{RK817_CODEC_APLL_CFG3, 0x0c},
 	{RK817_CODEC_APLL_CFG4, 0xa5},
 	{RK817_CODEC_APLL_CFG5, 0x00},
 
@@ -361,11 +362,12 @@ static struct rk817_reg_val_typ capture_power_up_list[] = {
 
 	{RK817_CODEC_DDAC_MUTE_MIXCTL, 0x00},
 	{RK817_CODEC_AADC_CFG0, 0x08},
-	{RK817_CODEC_AMIC_CFG0, 0x0f},
+	{RK817_CODEC_AMIC_CFG0, 0x0a},
+	{RK817_CODEC_AMIC_CFG1, 0x30},
 	{RK817_CODEC_DI2S_TXCR3_TXCMD, 0x88},
 	{RK817_CODEC_DDAC_POPD_DACST, 0x02},
 	/* 0x29: -18db to 27db */
-	{RK817_CODEC_DMIC_PGA_GAIN, 0x99},
+	{RK817_CODEC_DMIC_PGA_GAIN, 0xaa},
 };
 
 #define RK817_CODEC_CAPTURE_POWER_UP_LIST_LEN \
@@ -398,6 +400,13 @@ static int rk817_codec_power_up(struct snd_soc_component *component, int type)
 						playback_power_up_list[i].reg,
 						playback_power_up_list[i].value);
 		}
+
+		snd_soc_component_update_bits(component, RK817_CODEC_DTOP_DIGEN_CLKE,
+					      DAC_DIG_CLK_MASK, DAC_DIG_CLK_DIS);
+		usleep_range(2000, 2500);
+		snd_soc_component_update_bits(component, RK817_CODEC_DTOP_DIGEN_CLKE,
+					      DAC_DIG_CLK_MASK, DAC_DIG_CLK_EN);
+		DBG("%s: %d - Playback DIG CLK OPS\n", __func__, __LINE__);
 	}
 
 	if (type & RK817_CODEC_CAPTURE) {
@@ -410,6 +419,13 @@ static int rk817_codec_power_up(struct snd_soc_component *component, int type)
 						capture_power_up_list[i].reg,
 						capture_power_up_list[i].value);
 		}
+
+		snd_soc_component_update_bits(component, RK817_CODEC_DTOP_DIGEN_CLKE,
+					      ADC_DIG_CLK_MASK, DAC_DIG_CLK_DIS);
+		usleep_range(2000, 2500);
+		snd_soc_component_update_bits(component, RK817_CODEC_DTOP_DIGEN_CLKE,
+					      ADC_DIG_CLK_MASK, ADC_DIG_CLK_EN);
+		DBG("%s: %d - Capture DIG CLK OPS\n", __func__, __LINE__);
 
 		if (rk817->mic_in_differential)
 			snd_soc_component_update_bits(component,
@@ -499,11 +515,11 @@ static const char * const rk817_playback_path_mode[] = {
 	"RING_SPK", "RING_HP", "RING_HP_NO_MIC", "RING_SPK_HP"}; /* 7-10 */
 
 static const char * const rk817_capture_path_mode[] = {
-	#ifdef RK817_CODEC_ONE_MIC
+#ifdef RK817_CODEC_ONE_MIC
 		"MIC OFF", "Main Mic"};
 #else
 	"MIC OFF", "Main Mic", "Hands Free Mic", "BT Sco Mic"};
-	#endif
+#endif
 
 static const char * const rk817_call_path_mode[] = {
 	"OFF", "RCV", "SPK", "HP", "HP_NO_MIC", "BT"}; /* 0-5 */
@@ -592,7 +608,7 @@ static int rk817_playback_path_config(struct snd_soc_component *component,
 			/* restart CLASS D, OCPP/N */
 			snd_soc_component_write(component,
 						RK817_CODEC_ACLASSD_CFG2,
-						0xc4);
+						0xf7);
 		} else {
 			/* HP_CP_EN , CP 2.3V */
 			snd_soc_component_write(component, RK817_CODEC_AHP_CP,
@@ -665,7 +681,7 @@ static int rk817_playback_path_config(struct snd_soc_component *component,
 			/* restart CLASS D, OCPP/N */
 			snd_soc_component_write(component,
 						RK817_CODEC_ACLASSD_CFG2,
-						0xc4);
+						0xf7);
 		}
 
 		snd_soc_component_write(component, RK817_CODEC_DDAC_VOLL,
@@ -733,7 +749,6 @@ static int rk817_capture_path_config(struct snd_soc_component *component,
 		if (pre_path == MIC_OFF)
 			rk817_codec_power_up(component, RK817_CODEC_CAPTURE);
 
-#if !defined(RK817_CODEC_ONE_MIC)
 		if (rk817->adc_for_loopback) {
 			/* don't need to gain when adc use for loopback */
 			snd_soc_component_update_bits(component,
@@ -751,6 +766,7 @@ static int rk817_capture_path_config(struct snd_soc_component *component,
 						0x00);
 			break;
 		}
+#if !defined(RK817_CODEC_ONE_MIC)
 		if (!rk817->mic_in_differential) {
 			snd_soc_component_write(component,
 						RK817_CODEC_DADC_VOLR,
@@ -896,12 +912,23 @@ static int rk817_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_component *component = rtd->codec_dai->component;
+	struct rk817_codec_priv *rk817 = snd_soc_component_get_drvdata(component);
 	unsigned int rate = params_rate(params);
 	unsigned char apll_cfg3_val;
 	unsigned char dtop_digen_sr_lmt0;
 	unsigned char dtop_digen_clke;
 
 	DBG("%s : sample rate = %dHz\n", __func__, rate);
+
+	if (rk817->chip_ver <= 0x4) {
+		DBG("%s: SMIC TudorAG and previous versions\n", __func__);
+		snd_soc_component_write(component, RK817_CODEC_APLL_CFG0, 0x0c);
+		snd_soc_component_write(component, RK817_CODEC_APLL_CFG4, 0x95);
+	} else {
+		DBG("%s: SMIC TudorAG version later\n", __func__);
+		snd_soc_component_write(component, RK817_CODEC_APLL_CFG0, 0x04);
+		snd_soc_component_write(component, RK817_CODEC_APLL_CFG4, 0xa5);
+	}
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		dtop_digen_clke = DAC_DIG_CLK_EN;
@@ -1225,6 +1252,9 @@ static int rk817_probe(struct snd_soc_component *component)
 {
 	struct rk817_codec_priv *rk817 = snd_soc_component_get_drvdata(component);
 	int ret = 0;
+	int chip_name = 0;
+	int chip_ver = 0;
+
 	DBG("%s\n", __func__);
 
 	if (!rk817) {
@@ -1236,6 +1266,11 @@ static int rk817_probe(struct snd_soc_component *component)
 	rk817->component = component;
 	rk817->playback_path = OFF;
 	rk817->capture_path = MIC_OFF;
+
+	chip_name = snd_soc_component_read32(component, RK817_PMIC_CHIP_NAME);
+	chip_ver = snd_soc_component_read32(component, RK817_PMIC_CHIP_VER);
+	rk817->chip_ver = (chip_ver & 0x0f);
+	dev_info(component->dev, "%s: chip_name:0x%x, chip_ver:0x%x\n", __func__, chip_name, chip_ver);
 
 	rk817_reset(component);
 	snd_soc_add_component_controls(component, rk817_snd_path_controls,
@@ -1449,7 +1484,7 @@ static const struct regmap_config rk817_codec_regmap_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
 	.reg_stride = 1,
-	.max_register = 0x4f,
+	.max_register = 0xfe,
 	.cache_type = REGCACHE_FLAT,
 	.volatile_reg = rk817_volatile_register,
 	.writeable_reg = rk817_codec_register,
