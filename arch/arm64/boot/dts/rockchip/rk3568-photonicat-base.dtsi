@@ -119,7 +119,6 @@
 		regulator-name = "vdd_logic";
 		regulator-min-microvolt = <800000>;
 		regulator-max-microvolt = <1200000>;
-		/* regulator-init-microvolt = <900000>; */
 		regulator-init-microvolt = <900000>;
 		regulator-always-on;
 		regulator-boot-on;
@@ -188,7 +187,7 @@
 };
 
 &gpu {
-	mali-supply = <&vdd_fixed>;
+	mali-supply = <&vdd_npu>;
 	status = "okay";
 };
 
@@ -198,14 +197,21 @@
 
 &hdmi {
 	status = "okay";
+	rockchip,phy-table =
+		<92812500  0x8009 0x0000 0x0270>,
+		<165000000 0x800b 0x0000 0x026d>,
+		<185625000 0x800b 0x0000 0x01ed>,
+		<297000000 0x800b 0x0000 0x01ad>,
+		<594000000 0x8029 0x0000 0x0088>,
+		<000000000 0x0000 0x0000 0x0000>;
 };
 
 &hdmi_in_vp0 {
-	status = "okay";
+	status = "disabled";
 };
 
 &hdmi_in_vp1 {
-	status = "disabled";
+	status = "okay";
 };
 
 &i2c0 {
@@ -439,8 +445,8 @@
 
 &vop {
 	status = "okay";
-	assigned-clocks = <&cru DCLK_VOP1>;
-	assigned-clock-parents = <&cru PLL_VPLL>;
+	assigned-clocks = <&cru DCLK_VOP0>, <&cru DCLK_VOP1>;
+	assigned-clock-parents = <&pmucru PLL_HPLL>, <&cru PLL_VPLL>;
 };
 
 &vop_mmu {
