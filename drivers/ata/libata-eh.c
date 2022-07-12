@@ -2980,6 +2980,7 @@ int ata_eh_reset(struct ata_link *link, int classify,
 		ata_link_warn(link,
 			      "link online but %d devices misclassified, "
 			      "device detection might fail\n", nr_unknown);
+#ifndef MODULE
 	} else if (ata_is_host_link(link)) {
 		ata_link_err(link, "ready = %x sstatus = %x\n", ahci_check_ready(link), sstatus);
 		if (!ahci_check_ready(link) && try < max_tries && sstatus != 3) {
@@ -2988,6 +2989,7 @@ int ata_eh_reset(struct ata_link *link, int classify,
 			rc = -EAGAIN;
 			goto fail;
 		}
+#endif
 	}
 
 	/* reset successful, schedule revalidation */
