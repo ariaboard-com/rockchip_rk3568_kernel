@@ -80,7 +80,7 @@
 		expanded_version = <IGNORE_THIS>;
 		reserved = <IGNORE_THIS>;
 		/* freq info, freq_0 is final frequency, unit: MHz */
-		freq_0 = <1056>;
+		freq_0 = <1332>;
 		freq_1 = <324>;
 		freq_2 = <528>;
 		freq_3 = <780>;

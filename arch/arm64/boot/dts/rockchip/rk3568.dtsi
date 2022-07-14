@@ -1280,7 +1280,7 @@
 			91001    100000  2
 		>;
 		rockchip,pvtm-ch = <0 5>;
-
+/*
 		opp-200000000 {
 			opp-hz = /bits/ 64 <200000000>;
 			opp-microvolt = <850000>;
@@ -1302,6 +1302,7 @@
 			opp-microvolt-L1 = <825000>;
 			opp-microvolt-L2 = <825000>;
 		};
+
 		opp-600000000 {
 			opp-hz = /bits/ 64 <600000000>;
 			opp-microvolt = <875000>;
@@ -1309,6 +1310,7 @@
 			opp-microvolt-L1 = <825000>;
 			opp-microvolt-L2 = <825000>;
 		};
+*/
 		opp-700000000 {
 			opp-hz = /bits/ 64 <700000000>;
 			opp-microvolt = <950000>;
@@ -2046,6 +2048,31 @@
 		};
 	};
 
+	nocp_cpu: nocp-cpu@fe102000 {
+		compatible = "rockchip,rk3568-nocp";
+		reg = <0x0 0xfe102000 0x0 0x100>;
+	};
+
+	nocp_gpu_vpu_rga_venc: nocp-gpu-vpu-rga-venc@fe102400 {
+		compatible = "rockchip,rk3568-nocp";
+		reg = <0x0 0xfe102400 0x0 0x100>;
+	};
+
+	nocp_npu_vdec: nocp-vdec@fe102800 {
+		compatible = "rockchip,rk3568-nocp";
+		reg = <0x0 0xfe102800 0x0 0x100>;
+	};
+
+	nocp_vi_usb_peri_pipe: nocp-vi-usb-peri-pipe@fe102c00 {
+		compatible = "rockchip,rk3568-nocp";
+		reg = <0x0 0xfe102c00 0x0 0x100>;
+	};
+
+	nocp_vo: nocp-vo@fe103000 {
+		compatible = "rockchip,rk3568-nocp";
+		reg = <0x0 0xfe103000 0x0 0x100>;
+	};
+
 	qos_gpu: qos@fe128000 {
 		compatible = "syscon";
 		reg = <0x0 0xfe128000 0x0 0x20>;
@@ -2207,8 +2234,8 @@
 		compatible = "rockchip,rk3568-dmc";
 		interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "complete";
-		devfreq-events = <&dfi>;
-		clocks = <&cru SCLK_DDRCLK>;
+		devfreq-events = <&dfi>, <&nocp_cpu>;
+		clocks = <&scmi_clk 3>;
 		clock-names = "dmc_clk";
 		operating-points-v2 = <&dmc_opp_table>;
 		vop-bw-dmc-freq = <
@@ -2229,17 +2256,17 @@
 		>;
 		upthreshold = <40>;
 		downdifferential = <20>;
-		system-status-freq = <
-			/*system status         freq(KHz)*/
-			SYS_STATUS_NORMAL       780000
-			SYS_STATUS_REBOOT       1332000
-			SYS_STATUS_SUSPEND      324000
-			SYS_STATUS_VIDEO_4K     780000
-			SYS_STATUS_VIDEO_4K_10B 780000
-			SYS_STATUS_BOOST        1332000
-			SYS_STATUS_ISP          1332000
-			SYS_STATUS_PERFORMANCE  1332000
-			SYS_STATUS_DUALVIEW     1332000
+		system-status-level = <
+			/*system status         freq level*/
+			SYS_STATUS_NORMAL       DMC_FREQ_LEVEL_MID_HIGH
+			SYS_STATUS_REBOOT       DMC_FREQ_LEVEL_HIGH
+			SYS_STATUS_SUSPEND      DMC_FREQ_LEVEL_LOW
+			SYS_STATUS_VIDEO_4K     DMC_FREQ_LEVEL_MID_HIGH
+			SYS_STATUS_VIDEO_4K_10B DMC_FREQ_LEVEL_MID_HIGH
+			SYS_STATUS_BOOST        DMC_FREQ_LEVEL_HIGH
+			SYS_STATUS_ISP          DMC_FREQ_LEVEL_HIGH
+			SYS_STATUS_PERFORMANCE  DMC_FREQ_LEVEL_HIGH
+			SYS_STATUS_DUALVIEW     DMC_FREQ_LEVEL_HIGH
 		>;
 		auto-min-freq = <324000>;
 		auto-freq-en = <1>;
